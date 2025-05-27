@@ -10,7 +10,6 @@ import {
   FiX,
   FiEye,
   FiDownload,
-  FiAlertCircle,
   FiFileText
 } from 'react-icons/fi';
 

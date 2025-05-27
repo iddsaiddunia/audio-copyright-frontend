@@ -68,6 +68,12 @@ const AdminLayout = () => {
       permission: 'generateReports' // Financial Admin
     },
     { 
+      path: '/admin/user-management', 
+      label: 'User Management', 
+      icon: <FiUsers className="w-5 h-5" />,
+      permission: 'manageUsers' // Technical Admin only
+    },
+    { 
       path: '/admin/settings', 
       label: 'System Settings', 
       icon: <FiSettings className="w-5 h-5" />,

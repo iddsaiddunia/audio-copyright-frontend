@@ -39,10 +39,15 @@ export const rolePermissions = {
   artist: [
     'uploadTracks',
     'manageCopyrights',
-    'viewRoyalties',
     'transferOwnership',
     'setLicenseTerms',
-    'viewAnalytics'
+    'viewAnalytics',
+    // Artists can also have licensee permissions
+    'requestLicenses',
+    'manageLicenses',
+    'viewLicensedContent',
+    'downloadLicensedContent',
+    'reportUsage'
   ],
   
   licensee: [
@@ -51,13 +56,10 @@ export const rolePermissions = {
     'viewLicensedContent',
     'downloadLicensedContent',
     'reportUsage'
-  ],
-  
-  listener: [
-    'browseContent',
-    'verifyTracks',
-    'viewPublicInfo'
   ]
+  
+  // Note: 'listener' role removed as it represents any non-registered user
+  // Public permissions are handled separately in the backend
 };
 
 // User interface with roles

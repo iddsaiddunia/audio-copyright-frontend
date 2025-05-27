@@ -46,6 +46,7 @@ import BlockchainRegistry from './pages/admin/BlockchainRegistry';
 import SystemSettings from './pages/admin/SystemSettings';
 import FinancialReports from './pages/admin/FinancialReports';
 import PaymentVerification from './pages/admin/PaymentVerification';
+import UserManagement from './pages/admin/UserManagement';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -110,6 +111,7 @@ function App() {
             <Route path="copyright-publishing" element={<CopyrightPublishing />} />
             <Route path="blockchain" element={<BlockchainRegistry />} />
             <Route path="financial-reports" element={<FinancialReports />} />
+            <Route path="user-management" element={<UserManagement />} />
             <Route path="settings" element={<SystemSettings />} />
             </Route>
           </Route>
