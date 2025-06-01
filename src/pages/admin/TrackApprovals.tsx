@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { ApiService } from '../../services/apiService';
+const apiService = new ApiService({ getToken: () => localStorage.getItem('token') });
 import { motion } from 'framer-motion';
 import { usePayment } from '../../contexts/PaymentContext';
 import { FiAlertCircle } from 'react-icons/fi';
@@ -31,6 +33,7 @@ interface Track {
   lyrics?: string;
   audioFileName: string;
   isAvailableForLicensing: boolean;
+  paymentStatus?: string;
 }
 
 const TrackApprovals: React.FC = () => {
@@ -40,6 +43,7 @@ const TrackApprovals: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [genreFilter, setGenreFilter] = useState<string>('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -60,60 +64,27 @@ const TrackApprovals: React.FC = () => {
       setIsLoading(true);
       
       try {
-        // Simulate API call with timeout
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data for demonstration
-        setTracks([
-          {
-            id: '1',
-            title: 'Serengeti Sunset',
-            artist: {
-              id: '1',
-              name: 'John Doe'
-            },
-            genre: 'Bongo Flava',
-            releaseYear: '2025',
-            submittedAt: '2025-05-15T10:30:00Z',
-            status: 'pending' as const,
-            description: 'A song inspired by the beautiful sunsets of the Serengeti plains.',
-            lyrics: 'Sample lyrics for Serengeti Sunset...',
-            audioFileName: 'serengeti_sunset.mp3',
-            isAvailableForLicensing: true
+        // Fetch all tracks for admin
+        const response = await apiService.getAllTracks();
+        // Map response to Track interface, including artist name and payment status
+        const mapped = response.map((track: any) => ({
+          id: track.id,
+          title: track.title,
+          artist: {
+            id: track.artist?.id || '',
+            name: track.artist ? `${track.artist.firstName || ''} ${track.artist.lastName || ''}`.trim() : 'Unknown',
           },
-          {
-            id: '2',
-            title: 'Zanzibar Nights',
-            artist: {
-              id: '1',
-              name: 'John Doe'
-            },
-            genre: 'Afrobeat',
-            releaseYear: '2024',
-            submittedAt: '2025-05-10T14:20:00Z',
-            status: 'approved' as const,
-            description: 'A celebration of the vibrant nightlife in Stone Town, Zanzibar.',
-            lyrics: 'Sample lyrics for Zanzibar Nights...',
-            audioFileName: 'zanzibar_nights.mp3',
-            isAvailableForLicensing: true
-          },
-          {
-            id: '3',
-            title: 'Kilimanjaro Dreams',
-            artist: {
-              id: '2',
-              name: 'Maria Joseph'
-            },
-            genre: 'Taarab',
-            releaseYear: '2025',
-            submittedAt: '2025-05-20T09:15:00Z',
-            status: 'pending' as const,
-            description: 'A musical journey inspired by climbing Mount Kilimanjaro.',
-            lyrics: 'Sample lyrics for Kilimanjaro Dreams...',
-            audioFileName: 'kilimanjaro_dreams.mp3',
-            isAvailableForLicensing: false
-          }
-        ]);
+          genre: track.genre,
+          releaseYear: track.releaseYear,
+          submittedAt: track.createdAt || track.submittedAt || '',
+          status: track.status || (track.isVerified ? 'approved' : 'pending'),
+          description: track.description,
+          lyrics: track.lyrics,
+          audioFileName: track.filename || track.audioFileName,
+          isAvailableForLicensing: track.isAvailableForLicensing,
+          paymentStatus: track.paymentStatus || (track.payment ? track.payment.status : undefined),
+        }));
+        setTracks(mapped);
       } catch (err) {
         console.error('Failed to fetch tracks', err);
       } finally {
@@ -326,29 +297,20 @@ const TrackApprovals: React.FC = () => {
 
   // Filter tracks based on search query and filters
   const filteredTracks = tracks
-    .filter(track => {
-      // Apply search filter
-      if (searchQuery && !track.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !track.artist.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      
-      // Apply status filter
-      if (statusFilter !== 'all' && track.status !== statusFilter) {
-        return false;
-      }
-      
-      // Apply genre filter
-      if (genreFilter !== 'all' && track.genre !== genreFilter) {
-        return false;
-      }
-      
-      return true;
+    .filter((track: Track) => {
+      const matchesStatus = statusFilter === 'all' || track.status === statusFilter;
+      const matchesGenre = genreFilter === 'all' || track.genre === genreFilter;
+      const matchesSearch =
+        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        track.artist.name.toLowerCase().includes(searchQuery.toLowerCase());
+      let paymentStatus = track.paymentStatus ? track.paymentStatus.toLowerCase() : 'unknown';
+      const matchesPaymentStatus = paymentStatusFilter === 'all' || paymentStatus === paymentStatusFilter;
+      return matchesStatus && matchesGenre && matchesSearch && matchesPaymentStatus;
     })
-    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    .sort((a: Track, b: Track) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
 
   // Get unique genres for filter dropdown
-  const genres = Array.from(new Set(tracks.map(track => track.genre)));
+  const genres = Array.from(new Set(tracks.map((track: Track) => track.genre)));
 
   return (
     <motion.div
@@ -396,7 +358,7 @@ const TrackApprovals: React.FC = () => {
           {/* Expanded Filter Options */}
           {isFilterOpen && (
             <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md mb-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <label htmlFor="statusFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Status
@@ -414,7 +376,6 @@ const TrackApprovals: React.FC = () => {
                     <option value="copyrighted">Copyrighted</option>
                   </select>
                 </div>
-                
                 <div>
                   <label htmlFor="genreFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Genre
@@ -429,6 +390,21 @@ const TrackApprovals: React.FC = () => {
                     {genres.map((genre) => (
                       <option key={genre} value={genre}>{genre}</option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="paymentStatusFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Payment Status
+                  </label>
+                  <select
+                    id="paymentStatusFilter"
+                    value={paymentStatusFilter}
+                    onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                  >
+                    <option value="all">All</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
                   </select>
                 </div>
               </div>
@@ -473,6 +449,9 @@ const TrackApprovals: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
                     </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Payment Status
+                    </th>
                     <th scope="col" className="relative px-6 py-3">
                       <span className="sr-only">View</span>
                     </th>
@@ -504,6 +483,11 @@ const TrackApprovals: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(track.status)}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${track.paymentStatus === 'approved' || track.paymentStatus === 'verified' ? 'bg-green-100 text-green-800' : track.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {track.paymentStatus ? track.paymentStatus.charAt(0).toUpperCase() + track.paymentStatus.slice(1) : 'Unknown'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           type="button"
@@ -512,6 +496,28 @@ const TrackApprovals: React.FC = () => {
                         >
                           View Details
                         </button>
+                        {(track.paymentStatus === 'approved' || track.paymentStatus === 'verified') && track.status === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedTrack(track); setIsModalOpen(true); }}
+                              className="ml-2 inline-flex items-center px-3 py-1 border border-green-600 text-green-800 dark:text-green-300 rounded hover:bg-green-50 dark:hover:bg-green-900"
+                              disabled={isProcessing}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedTrack(track); setIsModalOpen(true); setIsRejecting(true); }}
+                              className="ml-2 inline-flex items-center px-3 py-1 border border-red-600 text-red-800 dark:text-red-300 rounded hover:bg-red-50 dark:hover:bg-red-900"
+                              disabled={isProcessing}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {/* If paymentStatus is not verified/approved, do not show any action buttons */}
+
                       </td>
                     </tr>
                   ))}
@@ -654,15 +660,25 @@ const TrackApprovals: React.FC = () => {
                   <>
                     {!isRejecting ? (
                       <>
-                        {isPaymentVerified(selectedTrack.id, 'track') ? (
-                          <button
-                            type="button"
-                            onClick={handleApprove}
-                            disabled={isProcessing}
-                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
-                          >
-                            Approve
-                          </button>
+                        {(selectedTrack.paymentStatus === 'approved' || selectedTrack.paymentStatus === 'verified') ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleApprove}
+                              disabled={isProcessing}
+                              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleReject}
+                              disabled={isProcessing}
+                              className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                              Reject
+                            </button>
+                          </>
                         ) : (
                           <div className="flex items-center mr-3 text-amber-500 dark:text-amber-400">
                             <FiAlertCircle className="h-5 w-5 mr-2" />
@@ -673,14 +689,6 @@ const TrackApprovals: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={handleReject}
-                          disabled={isProcessing}
-                          className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                        >
-                          Reject
-                        </button>
                       </>
                     ) : (
                       <>

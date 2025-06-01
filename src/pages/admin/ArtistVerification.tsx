@@ -1,4 +1,9 @@
 import { useState, useEffect } from 'react';
+import { ApiService } from '../../services/apiService';
+
+const apiService = new ApiService({
+  getToken: () => localStorage.getItem('token'),
+});
 import { motion } from 'framer-motion';
 import { 
   FiUser, 
@@ -42,96 +47,23 @@ const ArtistVerification: React.FC = () => {
   const [isRejecting, setIsRejecting] = useState(false);
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch applications
-    // For demo purposes, we'll use mock data
+    // Fetch applications from real API
     const fetchApplications = async () => {
       setIsLoading(true);
-      
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setApplications([
-          {
-            id: '1',
-            firstName: 'Maria',
-            lastName: 'Joseph',
-            email: 'maria.joseph@example.com',
-            phoneNumber: '+255 712 345 678',
-            idNumber: 'TZ-12345678',
-            submittedAt: '2025-05-22T13:45:00Z',
-            status: 'pending',
-            documents: [
-              { type: 'id', fileName: 'national_id.pdf', url: '#' },
-              { type: 'photo', fileName: 'profile_photo.jpg', url: '#' },
-              { type: 'proof_address', fileName: 'utility_bill.pdf', url: '#' }
-            ]
-          },
-          {
-            id: '2',
-            firstName: 'James',
-            lastName: 'Wilson',
-            email: 'james.wilson@example.com',
-            phoneNumber: '+255 723 456 789',
-            idNumber: 'TZ-23456789',
-            submittedAt: '2025-05-21T10:30:00Z',
-            status: 'pending',
-            documents: [
-              { type: 'id', fileName: 'national_id.pdf', url: '#' },
-              { type: 'photo', fileName: 'profile_photo.jpg', url: '#' },
-              { type: 'proof_address', fileName: 'utility_bill.pdf', url: '#' }
-            ]
-          },
-          {
-            id: '3',
-            firstName: 'Sarah',
-            lastName: 'Kimani',
-            email: 'sarah.kimani@example.com',
-            phoneNumber: '+255 734 567 890',
-            idNumber: 'TZ-34567890',
-            submittedAt: '2025-05-20T14:15:00Z',
-            status: 'approved',
-            documents: [
-              { type: 'id', fileName: 'national_id.pdf', url: '#' },
-              { type: 'photo', fileName: 'profile_photo.jpg', url: '#' },
-              { type: 'proof_address', fileName: 'utility_bill.pdf', url: '#' }
-            ]
-          },
-          {
-            id: '4',
-            firstName: 'David',
-            lastName: 'Mwangi',
-            email: 'david.mwangi@example.com',
-            phoneNumber: '+255 745 678 901',
-            idNumber: 'TZ-45678901',
-            submittedAt: '2025-05-19T09:45:00Z',
-            status: 'rejected',
-            documents: [
-              { type: 'id', fileName: 'national_id.pdf', url: '#' },
-              { type: 'photo', fileName: 'profile_photo.jpg', url: '#' }
-            ]
-          },
-          {
-            id: '5',
-            firstName: 'Robert',
-            lastName: 'Mbuki',
-            email: 'robert.mbuki@example.com',
-            phoneNumber: '+255 756 789 012',
-            idNumber: 'TZ-56789012',
-            submittedAt: '2025-05-21T16:45:00Z',
-            status: 'approved',
-            documents: [
-              { type: 'id', fileName: 'national_id.pdf', url: '#' },
-              { type: 'photo', fileName: 'profile_photo.jpg', url: '#' },
-              { type: 'proof_address', fileName: 'utility_bill.pdf', url: '#' }
-            ]
-          }
-        ]);
+        const response = await apiService.getArtists();
+        const mapped = response.map((artist: any) => ({
+          ...artist,
+          status: artist.isVerified ? 'approved' : 'pending',
+        }));
+        setApplications(mapped);
       } catch (err) {
         console.error('Failed to fetch applications', err);
       } finally {
         setIsLoading(false);
       }
     };
+
     
     fetchApplications();
   }, []);
@@ -180,9 +112,9 @@ const ArtistVerification: React.FC = () => {
     setIsProcessing(true);
     
     try {
-      // In a real app, this would be an API call to approve the application
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      // Call the real API to approve the artist
+      await apiService.approveArtist(selectedApplication.id);
+
       // Update the application status in our local state
       setApplications(prevApplications => 
         prevApplications.map(app => 

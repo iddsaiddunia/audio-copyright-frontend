@@ -83,6 +83,11 @@ export class ApiService {
     return this.request<any[]>({ url: '/tracks/pending', method: 'GET' });
   }
 
+  getAllTracks() {
+    return this.request<any[]>({ url: '/tracks/all', method: 'GET' });
+  
+  }
+
   getTrackById(id: string) {
     return this.request<any>({ url: `/tracks/${id}`, method: 'GET' });
   }
