@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHome, FiCheckCircle, FiSearch, FiInfo, FiMenu, FiX, FiMoon, FiSun, FiUser, FiLogIn, FiUpload, FiList, FiDollarSign } from 'react-icons/fi';
+import { FiHome, FiCheckCircle, FiSearch, FiInfo, FiX, FiMoon, FiSun, FiUser, FiUpload, FiList, FiDollarSign, FiLogOut } from 'react-icons/fi';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MainLayoutProps {
   requireAuth?: 'artist' | 'admin' | undefined;
 }
 
 const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
+  const { currentUser, isLoading, logout } = useAuth();
+  const adminType = currentUser?.adminType;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const location = useLocation();
@@ -16,29 +19,33 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  // Check authentication on mount
+  const handleLogout = async () => {
+    await logout();
+    navigate('/auth/login');
+  };
+
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('auth_token');
-      const userRole = localStorage.getItem('user_role');
-      
-      // Check if token exists and role matches required auth
-      if (token && (!requireAuth || (requireAuth === userRole))) {
-        setIsAuthenticated(true);
-      } else if (requireAuth) {
-        // Only redirect if authentication is required but missing/invalid
-        setIsAuthenticated(false);
-        navigate('/auth/login', { replace: true });
-      } else {
-        setIsAuthenticated(false);
-      }
-    };
-    
-    checkAuth();
-    // Remove isAuthenticated from dependency array to prevent redirect loops
-  }, [requireAuth, navigate]);
+    if (isLoading) return;
+    if (!requireAuth) return;
+    if (!currentUser) {
+      navigate('/auth/login', { replace: true });
+      return;
+    }
+    if (requireAuth === 'artist' && currentUser.role !== 'artist') {
+      navigate('/auth/login', { replace: true });
+      return;
+    }
+    if (requireAuth === 'admin' && currentUser.role === 'admin' && !adminType) {
+      // If admin but no adminType, treat as not authorized
+      navigate('/auth/login', { replace: true });
+      return;
+    }
+    if (requireAuth === 'admin' && currentUser.role !== 'admin') {
+      navigate('/auth/login', { replace: true });
+      return;
+    }
+  }, [requireAuth, currentUser, isLoading, navigate]);
   
   // Define navigation items based on the current context
   const getNavItems = () => {
@@ -51,8 +58,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
         { path: '/about', label: 'About Copyright', icon: <FiInfo className="w-5 h-5" /> },
       ];
     }
-    
-    // Artist navigation items
+
     if (requireAuth === 'artist') {
       return [
         { path: '/artist', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
@@ -64,10 +70,45 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
         { path: '/artist/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
       ];
     }
-    
+
+    if (requireAuth === 'admin' && adminType === 'content') {
+      return [
+        { path: '/admin', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
+        { path: '/admin/artist-verification', label: 'Artist Verification', icon: <FiCheckCircle className="w-5 h-5" /> },
+        { path: '/admin/track-approvals', label: 'Track Approvals', icon: <FiList className="w-5 h-5" /> },
+        { path: '/admin/license-requests', label: 'License Requests', icon: <FiList className="w-5 h-5" /> },
+        { path: '/admin/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
+      ];
+    }
+
+    if (requireAuth === 'admin' && adminType === 'financial') {
+      return [
+        { path: '/admin', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
+        { path: '/admin/payment-verification', label: 'Payment Verification', icon: <FiDollarSign className="w-5 h-5" /> },
+        { path: '/admin/financial-reports', label: 'Financial Reports', icon: <FiList className="w-5 h-5" /> },
+        { path: '/admin/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
+      ];
+    }
+
+    if (requireAuth === 'admin' && adminType === 'technical') {
+      return [
+        { path: '/admin', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
+        { path: '/admin/blockchain-registry', label: 'Blockchain Registry', icon: <FiList className="w-5 h-5" /> },
+        { path: '/admin/system-settings', label: 'System Settings', icon: <FiList className="w-5 h-5" /> },
+        { path: '/admin/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
+      ];
+    }
+    if (requireAuth === 'admin' && adminType === 'super') {
+      return [
+        { path: '/admin', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
+        { path: '/admin/user-management', label: 'User Management', icon: <FiUser className="w-5 h-5" /> },
+        { path: '/admin/system-settings', label: 'System Settings', icon: <FiList className="w-5 h-5" /> },
+        { path: '/admin/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
+      ];
+    }
     return [];
   };
-  
+
   const navItems = getNavItems();
 
   return (
@@ -117,39 +158,23 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
                   <FiMoon className="h-5 w-5" />
                 )}
               </button>
-              
-              {/* Authentication links - only show if not authenticated */}
-              {!isAuthenticated && (
-                <div className="ml-4 flex items-center space-x-2">
-                  <NavLink
-                    to="/auth/login"
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-200 shadow-sm text-sm font-medium rounded-md text-gray-600 bg-gray-50 hover:bg-gray-100 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                  >
-                    <FiLogIn className="-ml-0.5 mr-2 h-4 w-4" />
-                    Sign In
-                  </NavLink>
-                  <NavLink
-                    to="/auth/register"
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-cosota-light hover:bg-cosota focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota"
-                  >
-                    <FiUser className="-ml-0.5 mr-2 h-4 w-4" />
-                    Register
-                  </NavLink>
-                </div>
-              )}
 
-              {/* Mobile menu button for authenticated pages */}
-              {requireAuth && (
+              {/* Authentication links */}
+              {currentUser ? (
                 <button
-                  onClick={toggleSidebar}
-                  className="md:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                  onClick={handleLogout}
+                  className="ml-4 px-4 py-2 text-sm font-medium text-white bg-cosota rounded hover:bg-cosota-dark focus:outline-none flex items-center"
                 >
-                  {isSidebarOpen ? (
-                    <FiX className="h-6 w-6" />
-                  ) : (
-                    <FiMenu className="h-6 w-6" />
-                  )}
+                  <FiLogOut className="mr-2 h-4 w-4" />
+                  Logout
                 </button>
+              ) : (
+                <NavLink
+                  to="/auth/login"
+                  className="ml-4 px-4 py-2 text-sm font-medium text-cosota border border-cosota rounded hover:bg-cosota hover:text-white focus:outline-none"
+                >
+                  Login
+                </NavLink>
               )}
             </div>
           </div>
@@ -182,7 +207,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
                         <FiX className="h-6 w-6" />
                       </button>
                     </div>
-                    <nav className="mt-5 px-2 space-y-1">
+                    <div className="space-y-1 px-2">
                       {navItems.map((item) => (
                         <NavLink
                           key={item.path}
@@ -191,7 +216,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
                           className={({ isActive }) =>
                             `group flex items-center px-2 py-2 text-base font-medium rounded-md ${
                               isActive
-                                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
+                                ? 'bg-cosota-light/10 text-cosota dark:bg-cosota-dark/20 dark:text-cosota-light'
                                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
                             }`
                           }
@@ -200,7 +225,21 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
                           {item.label}
                         </NavLink>
                       ))}
-                    </nav>
+                      
+                      {/* Logout button in mobile sidebar */}
+                      {currentUser && (
+                        <button
+                          onClick={() => {
+                            toggleSidebar();
+                            handleLogout();
+                          }}
+                          className="w-full group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                        >
+                          <div className="mr-4"><FiLogOut className="w-5 h-5" /></div>
+                          Logout
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>

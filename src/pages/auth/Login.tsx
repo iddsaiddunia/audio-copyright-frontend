@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiLogIn, FiAlertCircle } from 'react-icons/fi';
@@ -8,8 +8,32 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const navigate = useNavigate();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, currentUser } = useAuth();
+
+  // Effect to handle navigation after successful login
+  useEffect(() => {
+    if (loginSuccess && currentUser) {
+      // Debug logging
+      console.debug('[Login] After login:', { 
+        email,
+        currentUser,
+        role: currentUser?.role,
+        adminType: currentUser?.adminType,
+        destination: currentUser?.role === 'admin' ? '/admin' : '/artist'
+      });
+      
+      // Redirect based on role
+      if (currentUser.role === 'admin') {
+        console.debug('[Login] Navigating to admin dashboard');
+        navigate('/admin');
+      } else {
+        console.debug('[Login] Navigating to artist dashboard');
+        navigate('/artist');
+      }
+    }
+  }, [loginSuccess, currentUser, navigate, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,14 +49,9 @@ const Login: React.FC = () => {
     try {
       // Use the login function from AuthContext
       await login(email, password);
-      
-      // Redirect based on email pattern
-      if (email.includes('admin') || email.includes('content') || email.includes('finance') || email.includes('technical')) {
-        navigate('/admin');
-      } else {
-        navigate('/artist');
-      }
+      setLoginSuccess(true);
     } catch (err) {
+      console.error('[Login] Login error:', err);
       setError('An error occurred during login. Please try again.');
     }
   };

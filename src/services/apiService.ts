@@ -34,7 +34,7 @@ export class ApiService {
 
   // Auth endpoints
   login(data: { email: string; password: string }) {
-    return this.request<{ token: string }>({
+    return this.request<{ token: string; user: any }>({
       url: '/auth/login',
       method: 'POST',
       data,
@@ -49,20 +49,50 @@ export class ApiService {
     });
   }
 
+  logout() {
+    return this.request<{ message: string }>({
+      url: '/auth/logout',
+      method: 'POST',
+    });
+  }
+
+  getProfile() {
+    return this.request<any>({
+      url: '/auth/me',
+      method: 'GET',
+    });
+  }
+
   // Track endpoints
+  uploadTrack(audio: File) {
+    const formData = new FormData();
+    formData.append('audio', audio);
+    return this.request<any>({
+      url: '/tracks/upload',
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data' },
+      data: formData,
+    });
+  }
+
   getMyTracks() {
     return this.request<any[]>({ url: '/tracks/my', method: 'GET' });
+  }
+
+  getPendingTracks() {
+    return this.request<any[]>({ url: '/tracks/pending', method: 'GET' });
   }
 
   getTrackById(id: string) {
     return this.request<any>({ url: `/tracks/${id}`, method: 'GET' });
   }
 
-  publishTrackCopyright(id: string) {
-    return this.request<{ message: string; txHash: string }>({
-      url: `/tracks/${id}/publish`,
-      method: 'POST',
-    });
+  approveTrack(id: string) {
+    return this.request<any>({ url: `/tracks/${id}/approve`, method: 'POST' });
+  }
+
+  rejectTrack(id: string) {
+    return this.request<any>({ url: `/tracks/${id}/reject`, method: 'POST' });
   }
 
   checkTrackCopyright(id: string) {
@@ -72,13 +102,32 @@ export class ApiService {
     });
   }
 
+  publishTrackCopyright(id: string) {
+    return this.request<{ message: string; txHash: string }>({
+      url: `/tracks/${id}/publish`,
+      method: 'POST',
+    });
+  }
+
   // Payments
-  createPayment(data: any) {
+  createRegistrationPayment(data: any) {
     return this.request<any>({ url: '/payments/create', method: 'POST', data });
   }
 
-  getPendingPayments() {
-    return this.request<any[]>({ url: '/payments/pending', method: 'GET' });
+  createTransferPayment(data: any) {
+    return this.request<any>({ url: '/payments/transfer/create', method: 'POST', data });
+  }
+
+  createLicensingPayment(data: any) {
+    return this.request<any>({ url: '/payments/licensing/create', method: 'POST', data });
+  }
+
+  getArtistPayments() {
+    return this.request<any[]>({ url: '/payments/artist/all', method: 'GET' });
+  }
+
+  getAllPayments() {
+    return this.request<any[]>({ url: '/payments/all', method: 'GET' });
   }
 
   approvePayment(id: string) {
@@ -89,26 +138,64 @@ export class ApiService {
     return this.request<any>({ url: `/payments/${id}/reject`, method: 'POST' });
   }
 
+  generateInvoice(id: string) {
+    return this.request<any>({ url: `/payments/${id}/invoice`, method: 'POST' });
+  }
+
   // Licensing & Transfer
   issueLicense(trackId: string, data: any) {
     return this.request<any>({ url: `/licensing/${trackId}/issue`, method: 'POST', data });
   }
 
-  transferCopyright(trackId: string, data: any) {
-    return this.request<any>({ url: `/transfer/${trackId}/transfer`, method: 'POST', data });
+  transferCopyright(trackId: string) {
+    return this.request<any>({ url: `/transfer/${trackId}/transfer`, method: 'POST' });
   }
 
-  // Admin endpoints (examples)
-  getPendingTracks() {
-    return this.request<any[]>({ url: '/tracks/pending', method: 'GET' });
+  // Artist admin endpoints
+  getArtists() {
+    return this.request<any[]>({ url: '/artists/', method: 'GET' });
   }
 
-  approveTrack(id: string) {
-    return this.request<any>({ url: `/tracks/${id}/approve`, method: 'POST' });
+  approveArtist(id: string) {
+    return this.request<any>({ url: `/artists/${id}/approve`, method: 'POST' });
   }
 
-  rejectTrack(id: string) {
-    return this.request<any>({ url: `/tracks/${id}/reject`, method: 'POST' });
+  rejectArtist(id: string) {
+    return this.request<any>({ url: `/artists/${id}/reject`, method: 'POST' });
+  }
+
+  // User endpoints
+  getCurrentUser() {
+    return this.request<any>({ url: '/users/me', method: 'GET' });
+  }
+
+  listUsers() {
+    return this.request<any[]>({ url: '/users', method: 'GET' });
+  }
+
+  createAdminUser(data: any) {
+    return this.request<any>({ url: '/users', method: 'POST', data });
+  }
+
+  updateUser(id: string, data: any) {
+    return this.request<any>({ url: `/users/${id}`, method: 'PUT', data });
+  }
+
+  updateUserStatus(id: string, data: any) {
+    return this.request<any>({ url: `/users/${id}/status`, method: 'PUT', data });
+  }
+
+  verifyArtist(id: string) {
+    return this.request<any>({ url: `/users/${id}/verify`, method: 'PUT' });
+  }
+
+  deleteUser(id: string) {
+    return this.request<any>({ url: `/users/${id}`, method: 'DELETE' });
+  }
+
+  // Health check
+  healthCheck() {
+    return this.request<{ status: string; message: string }>({ url: '/health', method: 'GET' });
   }
 
   // Add more endpoints as needed...

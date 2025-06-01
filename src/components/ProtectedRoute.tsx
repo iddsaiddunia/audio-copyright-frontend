@@ -32,14 +32,28 @@ function ProtectedRoute({ requiredRole, requiredPermission }: ProtectedRouteProp
     return <Navigate to="/auth/login" replace />;
   }
   
+  // Debug logging for authentication checks
+  console.debug('[ProtectedRoute] Auth check:', {
+    path: location.pathname,
+    user: currentUser,
+    role: currentUser?.role,
+    adminType: currentUser?.adminType,
+    requiredRole,
+    requiredPermission,
+    isAdmin: isAdmin(),
+    hasRequiredRole: requiredRole ? hasRole(requiredRole) : 'not required'
+  });
+
   // Special handling for admin routes
   if (location.pathname.startsWith('/admin')) {
     // For admin routes, check if user is any type of admin
     if (!isAdmin()) {
+      console.debug('[ProtectedRoute] Redirecting to 404: Not an admin');
       return <Navigate to="/404" replace />;
     }
   } else if (requiredRole && !hasRole(requiredRole)) {
     // For non-admin routes with a required role
+    console.debug('[ProtectedRoute] Redirecting to 404: Missing required role', requiredRole);
     return <Navigate to="/404" replace />;
   }
   

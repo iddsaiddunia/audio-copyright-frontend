@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUserPlus, FiAlertCircle, FiCheck, FiInfo } from 'react-icons/fi';
+import { ApiService } from '../../services/apiService';
 
 interface FormData {
   firstName: string;
@@ -85,14 +86,13 @@ const Register: React.FC = () => {
     setError(null);
     
     try {
-      // In a real app, this would be an API call to register the user
-      // For demo purposes, we'll simulate a successful registration after a delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Instantiate ApiService (no token needed for registration)
+      const api = new ApiService({ getToken: () => null });
+      await api.register(formData);
       // Navigate to a success page or login page
       navigate('/auth/registration-submitted');
-    } catch (err) {
-      setError('An error occurred during registration. Please try again.');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'An error occurred during registration. Please try again.');
     } finally {
       setIsLoading(false);
     }

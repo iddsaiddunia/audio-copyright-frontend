@@ -27,75 +27,84 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // In a real app, you would verify the token with your backend
-        const storedUser = localStorage.getItem('cosotaUser');
-        
-        if (storedUser) {
-          setCurrentUser(JSON.parse(storedUser));
+        const token = localStorage.getItem('token');
+        let user = null;
+        if (token) {
+          try {
+            const { jwtDecode } = await import('jwt-decode');
+            const decoded: any = jwtDecode(token);
+            const storedUser = localStorage.getItem('cosotaUser');
+            let role = decoded.role;
+            let adminType = decoded.adminType && decoded.adminType !== 'null' && decoded.adminType !== null ? decoded.adminType : undefined;
+            if (storedUser) {
+              const parsed = JSON.parse(storedUser);
+              role = parsed.role || role;
+              adminType = parsed.adminType || adminType;
+              // PATCH: If adminType is missing but roles array exists, extract adminType
+              if (role === 'admin' && !adminType && Array.isArray(parsed.roles)) {
+                const possibleTypes = ['content', 'financial', 'technical', 'super'];
+                adminType = parsed.roles.find((r: string) => possibleTypes.includes(r));
+              }
+              user = { ...parsed, id: decoded.id, role, adminType };
+            } else {
+              // PATCH: If adminType is missing but decoded.roles exists, extract adminType
+              if (role === 'admin' && !adminType && Array.isArray(decoded.roles)) {
+                const possibleTypes = ['content', 'financial', 'technical', 'super'];
+                adminType = decoded.roles.find((r: string) => possibleTypes.includes(r));
+              }
+              user = { id: decoded.id, role, adminType, email: decoded.email || '', name: decoded.name || '' };
+            }
+            // Debug log
+            console.debug('[AuthContext] Set currentUser:', user);
+            setCurrentUser(user);
+          } catch (e) {
+            // Invalid token
+            localStorage.removeItem('token');
+            localStorage.removeItem('cosotaUser');
+            setCurrentUser(null);
+          }
+        } else {
+          setCurrentUser(null);
         }
       } catch (error) {
         console.error('Authentication error:', error);
-        // Clear potentially corrupted data
+        localStorage.removeItem('token');
         localStorage.removeItem('cosotaUser');
+        setCurrentUser(null);
       } finally {
         setIsLoading(false);
       }
     };
-
     checkAuth();
   }, []);
 
   // Login function
-  const login = async (email: string, _password: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
-    
     try {
-      // In a real app, this would be an API call to your backend
-      // For demo purposes, we'll simulate a successful login with mock data
-      
-      // IMPORTANT: In production, this should be replaced with a real API call
-      // that returns a JWT token and user data after server-side verification
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user based on email (for demonstration only)
-      let mockUser: User;
-      
-      if (email.includes('admin')) {
-        mockUser = {
-          id: '1',
-          name: 'Admin User',
-          email,
-          roles: ['technicalAdmin', 'contentAdmin']
-        };
-      } else if (email.includes('finance')) {
-        mockUser = {
-          id: '2',
-          name: 'Finance Manager',
-          email,
-          roles: ['financialAdmin']
-        };
-      } else if (email.includes('content')) {
-        mockUser = {
-          id: '3',
-          name: 'Content Manager',
-          email,
-          roles: ['contentAdmin']
-        };
-      } else {
-        mockUser = {
-          id: '4',
-          name: 'Artist User',
-          email,
-          roles: ['artist']
-        };
+      const api = new (await import('../services/apiService')).ApiService({ getToken: () => null });
+      const data = await api.login({ email, password });
+      // Store JWT token
+      localStorage.setItem('token', data.token);
+      // Decode JWT for id, role, adminType
+      const { jwtDecode } = await import('jwt-decode');
+      const decoded: any = jwtDecode(data.token);
+      // Always produce a User object with correct role/adminType
+      let role = decoded.role;
+      let adminType = decoded.adminType && decoded.adminType !== 'null' && decoded.adminType !== null ? decoded.adminType : undefined;
+      // PATCH: If adminType is missing but roles array exists, extract adminType
+      if (role === 'admin' && !adminType && Array.isArray(data.user.roles)) {
+        const possibleTypes = ['content', 'financial', 'technical', 'super'];
+        adminType = data.user.roles.find((r: string) => possibleTypes.includes(r));
       }
-      
-      // Store user in localStorage (in production, store JWT token instead)
-      localStorage.setItem('cosotaUser', JSON.stringify(mockUser));
-      setCurrentUser(mockUser);
-      
+      const user = { ...data.user, id: decoded.id, role, adminType };
+      // Store user object for UI (no roles array, only role/adminType)
+      localStorage.setItem('cosotaUser', JSON.stringify(user));
+      // Optionally store user_role for legacy code
+      localStorage.setItem('user_role', decoded.role);
+      // Debug log
+      console.debug('[AuthContext] Login set currentUser:', user);
+      setCurrentUser(user);
     } catch (error) {
       console.error('Login error:', error);
       throw new Error('Login failed. Please check your credentials and try again.');
@@ -107,13 +116,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Logout function
   const logout = async () => {
     try {
-      // In a real app, you might need to invalidate the token on the server
+      // Get the token for the API call
+      const token = localStorage.getItem('token');
+      
+      // Call the backend logout endpoint
+      if (token) {
+        try {
+          const api = new (await import('../services/apiService')).ApiService({ getToken: () => token });
+          await api.logout();
+          console.debug('[AuthContext] Logout API call successful');
+        } catch (apiError) {
+          // Continue with client-side logout even if API call fails
+          console.error('Logout API call failed:', apiError);
+        }
+      }
+      
+      // Clear local storage
+      localStorage.removeItem('token');
       localStorage.removeItem('cosotaUser');
+      localStorage.removeItem('user_role');
       setCurrentUser(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
+
 
   // Permission checking functions
   const checkPermission = (action: string) => hasPermission(currentUser, action);

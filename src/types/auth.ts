@@ -1,17 +1,16 @@
 // Define all possible roles in the system
-export type AdminRole = 'contentAdmin' | 'financialAdmin' | 'technicalAdmin';
-export type UserRole = 'artist' | 'listener' | 'licensee' | AdminRole;
+export type UserRole = 'artist' | 'licensee' | 'admin';
+export type AdminType = 'content' | 'financial' | 'technical' | 'super';
 
 // Define permissions for each role
 export const rolePermissions = {
   // Admin roles
-  contentAdmin: [
+  content: [
     'verifyArtists', 
     'approveTracks', 
     'reviewMetadata'
   ],
-  
-  financialAdmin: [
+  financial: [
     'verifyPayments',           // General permission to verify any payment
     'verifyCopyrightPayments',  // Verify copyright registration payments
     'verifyTransferPayments',   // Verify ownership transfer payments
@@ -20,19 +19,25 @@ export const rolePermissions = {
     'handleDisputes',           // Handle payment disputes
     'viewTransactionHistory'    // View transaction history
   ],
-  
-  technicalAdmin: [
+  technical: [
     // Blockchain admin permissions
     'publishCopyrights', 
     'monitorTransactions', 
     'manageWallets',
-    
     // System admin permissions
     'manageUsers',
     'configureSystem',
     'viewLogs',
     'manageRoles',
     'backupSystem'
+  ],
+  super: [
+    // Super admin permissions (example)
+    'allPermissions',
+    'manageAdmins',
+    'systemOverride',
+    'viewAllReports',
+    'configurePlatform',
   ],
   
   // User roles
@@ -67,5 +72,6 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  roles: UserRole[];
+  role: UserRole;
+  adminType?: AdminType;
 }

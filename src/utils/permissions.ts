@@ -1,4 +1,4 @@
-import type { User, AdminRole, UserRole } from '../types/auth';
+import type { User, UserRole, AdminType } from '../types/auth';
 import { rolePermissions } from '../types/auth';
 
 /**
@@ -9,10 +9,15 @@ import { rolePermissions } from '../types/auth';
  */
 export function hasPermission(user: User | null, action: string): boolean {
   if (!user) return false;
-  
-  return user.roles.some(role => 
-    rolePermissions[role as keyof typeof rolePermissions]?.includes(action)
-  );
+  // Artists and licensees
+  if (user.role === 'artist' || user.role === 'licensee') {
+    return rolePermissions[user.role]?.includes(action);
+  }
+  // Admins
+  if (user.role === 'admin' && user.adminType) {
+    return rolePermissions[user.adminType]?.includes(action);
+  }
+  return false;
 }
 
 /**
@@ -21,9 +26,21 @@ export function hasPermission(user: User | null, action: string): boolean {
  * @param role The role to check for
  * @returns Boolean indicating if the user has the role
  */
-export function hasRole(user: User | null, role: UserRole): boolean {
+export function hasRole(user: User | null, role: UserRole | AdminType): boolean {
   if (!user) return false;
-  return user.roles.includes(role);
+  
+  // Special case: if checking for 'admin' role, just check user.role
+  if (role === 'admin') return user.role === 'admin';
+  
+  // For artist/licensee roles
+  if (role === 'artist' || role === 'licensee') return user.role === role;
+  
+  // For specific admin types
+  if (role === 'content' || role === 'financial' || role === 'technical' || role === 'super') {
+    return user.role === 'admin' && user.adminType === role;
+  }
+  
+  return false;
 }
 
 /**
@@ -33,20 +50,21 @@ export function hasRole(user: User | null, role: UserRole): boolean {
  */
 export function isAdmin(user: User | null): boolean {
   if (!user) return false;
-  const adminRoles: AdminRole[] = ['contentAdmin', 'financialAdmin', 'technicalAdmin'];
-  return user.roles.some(role => adminRoles.includes(role as AdminRole));
+  return user.role === 'admin';
 }
 
 /**
- * Get all permissions for a user based on their roles
+ * Get all permissions for a user based on their role/adminType
  * @param user The user to get permissions for
  * @returns Array of all permissions the user has
  */
 export function getAllPermissions(user: User | null): string[] {
   if (!user) return [];
-  
-  return user.roles.reduce((permissions: string[], role) => {
-    const rolePerms = rolePermissions[role as keyof typeof rolePermissions] || [];
-    return [...permissions, ...rolePerms];
-  }, []);
+  if (user.role === 'artist' || user.role === 'licensee') {
+    return rolePermissions[user.role] || [];
+  }
+  if (user.role === 'admin' && user.adminType) {
+    return rolePermissions[user.adminType] || [];
+  }
+  return [];
 }

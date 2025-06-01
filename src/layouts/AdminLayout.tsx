@@ -14,9 +14,10 @@ import {
   FiLogOut,
   FiMoon,
   FiSun,
-  FiDollarSign,
-  FiCreditCard
+  FiDollarSign
 } from 'react-icons/fi';
+
+import { rolePermissions } from '../types/auth';
 
 const AdminLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -81,6 +82,18 @@ const AdminLayout = () => {
     },
   ];
   
+  // Debug: log current permissions
+  const { currentUser } = useAuth();
+  let userPerms: string[] = [];
+  if (currentUser) {
+    if (currentUser.role === 'admin' && currentUser.adminType) {
+      userPerms = rolePermissions[currentUser.adminType] || [];
+    } else if (currentUser.role === 'artist' || currentUser.role === 'licensee') {
+      userPerms = rolePermissions[currentUser.role] || [];
+    }
+  }
+  console.log('AdminLayout nav debug:', { currentUser, userPerms });
+
   // Filter nav items based on user permissions
   const navItems = allNavItems.filter(item => 
     item.permission === null || hasPermission(item.permission)

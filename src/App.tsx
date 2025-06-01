@@ -83,14 +83,20 @@ function App() {
           </Route>
 
           {/* Artist Routes */}
-          <Route path="/artist" element={<ProtectedRoute requiredRole="artist" />}>
-            <Route element={<MainLayout />}>
-            <Route index element={<ArtistDashboard />} />
-            <Route path="register-track" element={<RegisterTrack />} />
-            <Route path="track-submitted" element={<TrackSubmitted />} />
-            <Route path="my-tracks" element={<MyTracks />} />
-            <Route path="my-tracks/:trackId" element={<TrackDetails />} />
-            <Route path="transfer-ownership/:trackId" element={<OwnershipTransfer />} />
+          <Route path="/artist" element={<ProtectedRoute requiredRole="artist" />}> 
+            <Route element={<MainLayout requireAuth="artist" />}>
+              <Route index element={<ArtistDashboard />} />
+              <Route path="register-track" element={<RegisterTrack />} />
+              <Route path="track-submitted" element={<TrackSubmitted />} />
+              <Route path="my-tracks" element={<MyTracks />} />
+              <Route path="my-tracks/:trackId" element={<TrackDetails />} />
+              <Route path="transfer-ownership/:trackId" element={<OwnershipTransfer />} />
+              <Route path="transfers" element={<TransfersList />} />
+              <Route path="transfers/:transferId" element={<TransferDetails />} />
+              <Route path="request-license" element={<RequestLicense />} />
+              <Route path="my-licenses" element={<MyLicenses />} />
+              <Route path="license-settings" element={<LicenseSettings cosotaCommissionPercentage={15} />} />
+              <Route path="profile" element={<MyProfile />} />
             <Route path="transfers" element={<TransfersList />} />
             <Route path="transfers/:transferId" element={<TransferDetails />} />
             <Route path="request-license" element={<RequestLicense />} />
@@ -101,7 +107,7 @@ function App() {
           </Route>
 
           {/* Admin Routes */}
-          <Route path="/admin" element={<ProtectedRoute />}>
+          <Route path="/admin" element={<ProtectedRoute requiredRole="admin" />}>
             <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="artist-verification" element={<ArtistVerification />} />
