@@ -48,19 +48,19 @@ export default function TrackPayments() {
     }
   }
 
-  // useEffect(() => {
-  //   const api = new ApiService({ getToken: () => localStorage.getItem('token') });
-  //   setLoading(true);
-  //   api.getMyPayments()
-  //     .then((data) => {
-  //       setPayments(data);
-  //       setLoading(false);
-  //     })
-  //     .catch(() => {
-  //       setError('Failed to load payments.');
-  //       setLoading(false);
-  //     });
-  // }, []);
+  useEffect(() => {
+    const api = new ApiService({ getToken: () => localStorage.getItem('token') });
+    setLoading(true);
+    api.getArtistPayments()
+      .then((data) => {
+        setPayments(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load payments.');
+        setLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     let filtered = payments.filter(p => p.paymentType === selectedType);

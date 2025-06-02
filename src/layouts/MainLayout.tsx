@@ -64,6 +64,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
         { path: '/artist', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
         { path: '/artist/register-track', label: 'Register Audio', icon: <FiUpload className="w-5 h-5" /> },
         { path: '/artist/my-tracks', label: 'My Tracks', icon: <FiList className="w-5 h-5" /> },
+        { path: '/artist/track-payments', label: 'Track Payments', icon: <FiDollarSign className="w-5 h-5" /> },
         { path: '/artist/request-license', label: 'Request License', icon: <FiCheckCircle className="w-5 h-5" /> },
         { path: '/artist/my-licenses', label: 'My Licenses', icon: <FiList className="w-5 h-5" /> },
         { path: '/artist/license-settings', label: 'License Settings', icon: <FiDollarSign className="w-5 h-5" /> },

@@ -30,6 +30,7 @@ import MyTracks from './pages/artist/MyTracks';
 import TrackDetails from './pages/artist/TrackDetails';
 import RequestLicense from './pages/artist/RequestLicense';
 import MyLicenses from './pages/artist/MyLicenses';
+import TrackPayments from './pages/artist/TrackPayments';
 import MyProfile from './pages/artist/MyProfile';
 import LicenseSettings from './pages/artist/LicenseSettings';
 import OwnershipTransfer from './pages/artist/OwnershipTransfer';
@@ -95,6 +96,7 @@ function App() {
               <Route path="transfers/:transferId" element={<TransferDetails />} />
               <Route path="request-license" element={<RequestLicense />} />
               <Route path="my-licenses" element={<MyLicenses />} />
+              <Route path="track-payments" element={<TrackPayments />} />
               <Route path="license-settings" element={<LicenseSettings cosotaCommissionPercentage={15} />} />
               <Route path="profile" element={<MyProfile />} />
             <Route path="transfers" element={<TransfersList />} />

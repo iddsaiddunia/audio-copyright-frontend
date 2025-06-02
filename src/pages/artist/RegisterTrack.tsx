@@ -120,9 +120,9 @@ const RegisterTrack: React.FC = () => {
       formPayload.append('title', formData.title);
       formPayload.append('genre', formData.genre);
       formPayload.append('releaseYear', String(formData.releaseYear));
-      if (formData.description) formPayload.append('description', formData.description);
+      formPayload.append('description', formData.description || '');
       formPayload.append('lyrics', formData.lyrics);
-      if (formData.collaborators) formPayload.append('collaborators', formData.collaborators);
+      formPayload.append('collaborators', formData.collaborators || '');
       formPayload.append('isAvailableForLicensing', String(formData.isAvailableForLicensing));
       formPayload.append('licenseFee', String(formData.licenseFee));
       formPayload.append('licenseTerms', formData.licenseTerms);

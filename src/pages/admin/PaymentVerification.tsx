@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { usePayment } from '../../contexts/PaymentContext';
-import type { PaymentStatus, PaymentEntityType } from '../../contexts/PaymentContext';
+import { ApiService } from '../../services/apiService';
 import { 
   FiCreditCard, 
   FiFilter, 
@@ -13,153 +12,90 @@ import {
   FiClock
 } from 'react-icons/fi';
 
-// Define extended payment data for UI
-interface PaymentDisplay extends PaymentStatus {
-  id: string; // Unique identifier for the payment record
-  transactionId: string;
+// Define payment entity type and payment type based on backend response
+export type PaymentEntityType = 'copyright' | 'license' | 'transfer';
+
+interface Payment {
+  id: string;
+  entityId?: string;
+  entityType?: PaymentEntityType;
+  isPaid?: boolean;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
+  amount: number;
+  amountPaid?: number;
+  transactionId?: string;
   submittedAt: string;
   verifiedAt?: string;
-  paymentMethod: string;
-  paymentDetails: string;
-  entityName: string; // Name of the track, license, etc.
-  artistName: string;
-  status: 'pending' | 'verified' | 'rejected'; // Payment status (alias for verificationStatus for UI consistency)
+  paymentMethod?: string;
+  paymentDetails?: string;
+  entityName?: string;
+  artistName?: string;
+  status?: 'pending' | 'verified' | 'rejected'; // for UI convenience
 }
 
+
 const PaymentVerification = () => {
-  const [payments, setPayments] = useState<PaymentDisplay[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('pending');
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'verified' | 'rejected' | 'all'>('pending');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [selectedPayment, setSelectedPayment] = useState<PaymentDisplay | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const { getAllPaymentsByStatus, updatePaymentStatus } = usePayment();
-  
-  // Fetch payments on component mount
+
+  const api = new ApiService({ getToken: () => localStorage.getItem('token') });
+
+  // Fetch payments from backend
   useEffect(() => {
-    const fetchPayments = async () => {
-      setIsLoading(true);
-      
-      try {
-        // Get all pending payments from context
-        const pendingPayments = getAllPaymentsByStatus('pending');
-        
-        // If we have no payments yet, create some mock data for demonstration
-        if (pendingPayments.length === 0) {
-          // This would normally come from an API
-          const mockPaymentData: PaymentDisplay[] = [
-            {
-              id: 'PAY-001',
-              entityId: 'CR-001',
-              entityType: 'copyright',
-              isPaid: true,
-              verificationStatus: 'pending',
-              status: 'pending',
-              amount: 25000,
-              transactionId: 'TXN-001-CR',
-              submittedAt: '2025-05-23T10:30:00Z',
-              paymentMethod: 'Bank Transfer',
-              paymentDetails: 'CRDB Bank, Ref: 78901234',
-              entityName: 'Serengeti Sunset',
-              artistName: 'John Doe'
-            },
-            {
-              id: 'PAY-002',
-              entityId: 'LI-002',
-              entityType: 'license',
-              isPaid: true,
-              verificationStatus: 'pending',
-              status: 'pending',
-              amount: 15000,
-              transactionId: 'TXN-002-LI',
-              submittedAt: '2025-05-22T14:45:00Z',
-              paymentMethod: 'Mobile Money',
-              paymentDetails: 'M-Pesa, Phone: +255 712 345 678',
-              entityName: 'License for Commercial Use - Zanzibar Nights',
-              artistName: 'Sarah Kimani'
-            },
-            {
-              id: 'PAY-003',
-              entityId: 'TR-003',
-              entityType: 'transfer',
-              isPaid: true,
-              verificationStatus: 'pending',
-              status: 'pending',
-              amount: 50000,
-              transactionId: 'TXN-003-TR',
-              submittedAt: '2025-05-21T09:15:00Z',
-              paymentMethod: 'Credit Card',
-              paymentDetails: 'Visa ending in 4321',
-              entityName: 'Ownership Transfer - Kilimanjaro Dreams',
-              artistName: 'Robert Mbuki'
-            },
-            {
-              id: 'PAY-004',
-              entityId: 'CR-004',
-              entityType: 'copyright',
-              isPaid: true,
-              verificationStatus: 'verified',
-              status: 'verified',
-              amount: 25000,
-              transactionId: 'TXN-004-CR',
-              submittedAt: '2025-05-20T11:30:00Z',
-              verifiedAt: '2025-05-20T15:45:00Z',
-              paymentMethod: 'Bank Transfer',
-              paymentDetails: 'NMB Bank, Ref: 56789012',
-              entityName: 'Dar es Salaam Groove',
-              artistName: 'Maria Joseph'
-            },
-            {
-              id: 'PAY-005',
-              entityId: 'LI-005',
-              entityType: 'license',
-              isPaid: true,
-              verificationStatus: 'rejected',
-              status: 'rejected',
-              amount: 10000,
-              transactionId: 'TXN-005-LI',
-              submittedAt: '2025-05-19T13:20:00Z',
-              verifiedAt: '2025-05-19T16:10:00Z',
-              paymentMethod: 'Mobile Money',
-              paymentDetails: 'Airtel Money, Phone: +255 786 123 456',
-              entityName: 'License for Radio Play - African Sunrise',
-              artistName: 'David Kamau'
-            }
-          ];
-          
-          setPayments(mockPaymentData);
-        } else {
-          // In a real app, we would fetch additional details for each payment
-          // For now, we'll just use mock data for the UI-specific fields
-          const enhancedPayments = pendingPayments.map(payment => {
-            return {
-              ...payment,
-              id: `PAY-${payment.entityId}`,
-              status: payment.verificationStatus, // Map verificationStatus to status for UI consistency
-              transactionId: `TXN-${payment.entityId}`,
-              submittedAt: new Date().toISOString(),
-              paymentMethod: 'Bank Transfer',
-              paymentDetails: 'Payment details would be fetched from API',
-              entityName: `Entity name for ${payment.entityId}`,
-              artistName: 'Artist name would be fetched from API'
-            };
-          });
-          
-          setPayments(enhancedPayments);
-        }
-      } catch (error) {
-        console.error('Error fetching payments:', error);
-      } finally {
+    setIsLoading(true);
+    api.getAllPayments()
+      .then((data: any[]) => {
+        // Normalize backend fields to frontend expectations
+        const mapped = data.map((p) => {
+          // Compose artist full name if artist object exists
+          let artistFullName = '';
+          if (p.artist) {
+            artistFullName = [p.artist.firstName, p.artist.lastName].filter(Boolean).join(' ');
+          } else if (p.artistName) {
+            artistFullName = p.artistName;
+          }
+          // Prefer track title as entityName if available
+          let entityName = (p.track && p.track.title) ? p.track.title : artistFullName;
+          return {
+            ...p,
+            transactionId: p.controlNumber,
+            entityName,
+            artistName: artistFullName,
+            submittedAt: p.createdAt,
+            verificationStatus:
+              p.status === 'approved'
+                ? 'verified'
+                : p.status === 'pending'
+                ? 'pending'
+                : p.status === 'rejected'
+                ? 'rejected'
+                : 'pending', // fallback
+            entityType:
+              p.paymentType === 'registration'
+                ? 'copyright'
+                : p.paymentType === 'licensing'
+                ? 'license'
+                : p.paymentType === 'transfer'
+                ? 'transfer'
+                : 'copyright', // fallback
+          };
+        });
+        setPayments(mapped);
         setIsLoading(false);
-      }
-    };
-    
-    fetchPayments();
-  }, [getAllPaymentsByStatus]);
-  
+      })
+      .catch(() => {
+        setPayments([]);
+        setIsLoading(false);
+      });
+  }, []);
+
+
   // Format currency values
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
@@ -215,7 +151,7 @@ const PaymentVerification = () => {
   };
   
   // Get type badge
-  const getTypeBadge = (type: PaymentEntityType) => {
+  const getTypeBadge = (type?: PaymentEntityType) => {
     switch (type) {
       case 'copyright':
         return (
@@ -245,7 +181,7 @@ const PaymentVerification = () => {
   };
   
   // Handle view payment details
-  const handleViewDetails = (payment: PaymentDisplay) => {
+  const handleViewDetails = (payment: Payment) => {
     setSelectedPayment(payment);
     setIsModalOpen(true);
   };
@@ -259,28 +195,14 @@ const PaymentVerification = () => {
   // Handle verify payment
   const handleVerifyPayment = async () => {
     if (!selectedPayment) return;
-    
     setIsProcessing(true);
-    
     try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Update payment status in context
-      updatePaymentStatus(selectedPayment.entityId, selectedPayment.entityType, 'verified');
-      
-      // Update local state
-      const updatedPayments = payments.map(payment => {
-        if (payment.entityId === selectedPayment.entityId) {
-          return {
-            ...payment,
-            verificationStatus: 'verified' as const,
-            verifiedAt: new Date().toISOString()
-          };
-        }
-        return payment;
-      });
-      
+      await api.approvePayment(selectedPayment.id);
+      const updatedPayments = payments.map(payment =>
+        payment.id === selectedPayment.id
+          ? { ...payment, verificationStatus: 'verified' as const, status: 'verified' as const, verifiedAt: new Date().toISOString() }
+          : payment
+      );
       setPayments(updatedPayments);
       setIsModalOpen(false);
       setSelectedPayment(null);
@@ -290,32 +212,18 @@ const PaymentVerification = () => {
       setIsProcessing(false);
     }
   };
-  
+
   // Handle reject payment
   const handleRejectPayment = async () => {
     if (!selectedPayment) return;
-    
     setIsProcessing(true);
-    
     try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Update payment status in context
-      updatePaymentStatus(selectedPayment.entityId, selectedPayment.entityType, 'rejected');
-      
-      // Update local state
-      const updatedPayments = payments.map(payment => {
-        if (payment.entityId === selectedPayment.entityId) {
-          return {
-            ...payment,
-            verificationStatus: 'rejected' as const,
-            verifiedAt: new Date().toISOString()
-          };
-        }
-        return payment;
-      });
-      
+      await api.rejectPayment(selectedPayment.id);
+      const updatedPayments = payments.map(payment =>
+        payment.id === selectedPayment.id
+          ? { ...payment, verificationStatus: 'rejected' as const, status: 'rejected' as const, verifiedAt: new Date().toISOString() }
+          : payment
+      );
       setPayments(updatedPayments);
       setIsModalOpen(false);
       setSelectedPayment(null);
@@ -325,20 +233,20 @@ const PaymentVerification = () => {
       setIsProcessing(false);
     }
   };
-  
+
   // Filter payments based on search query, status filter, and type filter
   const filteredPayments = payments.filter(payment => {
     const matchesSearch = 
-      payment.transactionId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.entityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.artistName.toLowerCase().includes(searchQuery.toLowerCase());
-    
+      (payment.transactionId?.toLowerCase() ?? '').includes(searchQuery.toLowerCase()) ||
+      (payment.entityName?.toLowerCase() ?? '').includes(searchQuery.toLowerCase()) ||
+      (payment.artistName?.toLowerCase() ?? '').includes(searchQuery.toLowerCase());
+
     const matchesStatus = statusFilter === 'all' || payment.verificationStatus === statusFilter;
     const matchesType = typeFilter === 'all' || payment.entityType === typeFilter;
-    
+
     return matchesSearch && matchesStatus && matchesType;
   });
-  
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -354,7 +262,7 @@ const PaymentVerification = () => {
           </p>
         </div>
       </div>
-      
+
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
@@ -377,7 +285,7 @@ const PaymentVerification = () => {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Status
@@ -386,7 +294,7 @@ const PaymentVerification = () => {
                 id="status-filter"
                 className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => setStatusFilter(e.target.value as 'pending' | 'verified' | 'rejected' | 'all')}
               >
                 <option value="all">All Statuses</option>
                 <option value="pending">Pending</option>
@@ -394,7 +302,7 @@ const PaymentVerification = () => {
                 <option value="rejected">Rejected</option>
               </select>
             </div>
-            
+
             <div>
               <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Type
@@ -414,7 +322,7 @@ const PaymentVerification = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Payments Table */}
       <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
@@ -428,7 +336,7 @@ const PaymentVerification = () => {
             <FiFilter className="h-5 w-5 text-gray-400" />
           </div>
         </div>
-        
+
         {isLoading ? (
           <div className="flex justify-center items-center py-20">
             <svg className="animate-spin h-10 w-10 text-cosota" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -513,7 +421,7 @@ const PaymentVerification = () => {
           </div>
         )}
       </div>
-      
+
       {/* Payment Details Modal */}
       {isModalOpen && selectedPayment && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
@@ -521,9 +429,9 @@ const PaymentVerification = () => {
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
             </div>
-            
+
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
@@ -542,7 +450,10 @@ const PaymentVerification = () => {
                       <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Type</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {selectedPayment.entityType.charAt(0).toUpperCase() + selectedPayment.entityType.slice(1)}
+                          {(selectedPayment?.entityType
+  ? selectedPayment.entityType.charAt(0).toUpperCase() + selectedPayment.entityType.slice(1)
+  : 'Unknown')}
+
                         </p>
                       </div>
                       <div>
@@ -558,12 +469,8 @@ const PaymentVerification = () => {
                         <p className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(selectedPayment.amount)}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Payment Method</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedPayment.paymentMethod}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Payment Details</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedPayment.paymentDetails}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Amount Paid</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(selectedPayment.amountPaid ?? 0)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Submitted At</p>
