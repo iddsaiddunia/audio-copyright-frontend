@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { 
   FiMusic, 
   FiUpload, 
-  FiDollarSign, 
   FiAlertCircle, 
   FiInfo,
   FiChevronLeft,
@@ -43,7 +42,7 @@ const RegisterTrack: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPaymentComplete, setIsPaymentComplete] = useState(false);
+
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -103,38 +102,53 @@ const RegisterTrack: React.FC = () => {
     setError(null);
   };
 
-  const handlePayment = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // In a real app, this would be an API call to process payment
-      // For demo purposes, we'll simulate a successful payment after a delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setIsPaymentComplete(true);
-    } catch (err) {
-      setError('An error occurred during payment processing. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     setIsLoading(true);
     setError(null);
-    
+
+    if (!formData.audioFile) {
+      setError('Audio file is required.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // In a real app, this would be an API call to submit the track
-      // For demo purposes, we'll simulate a successful submission after a delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Navigate to success page
+      const token = localStorage.getItem('token');
+      const formPayload = new FormData();
+      formPayload.append('title', formData.title);
+      formPayload.append('genre', formData.genre);
+      formPayload.append('releaseYear', String(formData.releaseYear));
+      if (formData.description) formPayload.append('description', formData.description);
+      formPayload.append('lyrics', formData.lyrics);
+      if (formData.collaborators) formPayload.append('collaborators', formData.collaborators);
+      formPayload.append('isAvailableForLicensing', String(formData.isAvailableForLicensing));
+      formPayload.append('licenseFee', String(formData.licenseFee));
+      formPayload.append('licenseTerms', formData.licenseTerms);
+      formPayload.append('audio', formData.audioFile);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'}/tracks/upload`,
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: formPayload,
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || 'Track upload failed.');
+        setIsLoading(false);
+        return;
+      }
       navigate('/artist/track-submitted');
-    } catch (err) {
-      setError('An error occurred during submission. Please try again.');
+    } catch (err: any) {
+      if (err?.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('An error occurred during submission. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -490,92 +504,31 @@ const RegisterTrack: React.FC = () => {
           </div>
         </div>
 
-        {!isPaymentComplete ? (
-          <div>
-            <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4 mb-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <FiAlertCircle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Payment Required</h3>
-                  <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
-                    <p>
-                      A non-refundable registration fee is required to proceed with your copyright registration.
-                      This fee covers the administrative costs of processing your application.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handlePayment}
-              disabled={isLoading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota ${
-                isLoading ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <FiDollarSign className="-ml-1 mr-2 h-4 w-4" />
-                  Pay Registration Fee
-                </>
-              )}
-            </button>
-          </div>
-        ) : (
-          <div>
-            <div className="rounded-md bg-green-50 dark:bg-green-900/20 p-4 mb-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <FiCheck className="h-5 w-5 text-green-400" aria-hidden="true" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-green-800 dark:text-green-300">Payment Complete</h3>
-                  <div className="mt-2 text-sm text-green-700 dark:text-green-400">
-                    <p>
-                      Your payment has been processed successfully. You can now submit your track for copyright registration.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isLoading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota ${
-                isLoading ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <FiUpload className="-ml-1 mr-2 h-4 w-4" />
-                  Submit for Copyright Registration
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        <div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota ${
+              isLoading ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <FiUpload className="-ml-1 mr-2 h-4 w-4" />
+                Submit for Copyright Registration
+              </>
+            )}
+          </button>
+        </div>
 
         <div className="text-sm text-gray-500 dark:text-gray-400">
           <p>

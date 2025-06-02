@@ -45,214 +45,26 @@ const TrackDetails: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the track details
-    // For demo purposes, we'll use mock data
     const fetchTrack = async () => {
       setIsLoading(true);
       setError(null);
-      
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data based on trackId
-        if (trackId === '1') {
-          setTrack({
-            id: '1',
-            title: 'Serengeti Sunset',
-            genre: 'Bongo Flava',
-            releaseYear: '2025',
-            description: 'A song inspired by the beautiful sunsets of the Serengeti plains.',
-            licenseFee: 75000,
-            licenseTerms: 'Commercial use requires proper attribution',
-            licenseCount: 2,
-            cosotaCommissionPercentage: 15,
-            lyrics: `Verse 1:
-Golden rays paint the savanna sky
-As day surrenders to the night
-Acacia trees stand silhouetted tall
-While nature's symphony begins to call
-
-Chorus:
-Serengeti sunset, colors fill my soul
-Orange, red, and purple hues take control
-Serengeti sunset, beauty beyond compare
-In this moment, I find peace so rare
-
-Verse 2:
-Lions roar in the distance wide
-As darkness slowly comes to hide
-The day's memories in shadows deep
-While stars above begin to peep
-
-[Chorus]
-
-Bridge:
-In this land of ancient dreams
-Where life and death play out their schemes
-I find myself, I lose myself
-In nature's perfect wealth
-
-[Chorus]
-
-Outro:
-Serengeti sunset, forever in my heart
-A perfect ending, a perfect start`,
-            collaborators: 'Produced by John Doe, Co-written with Jane Smith',
-            status: 'approved',
-            submittedAt: '2025-05-15T10:30:00Z',
-            approvedAt: '2025-05-18T14:45:00Z',
-            isAvailableForLicensing: true,
-            audioFileName: 'serengeti_sunset.mp3'
-          });
-        } else if (trackId === '2') {
-          setTrack({
-            id: '2',
-            title: 'Zanzibar Nights',
-            genre: 'Afrobeat',
-            releaseYear: '2024',
-            description: 'A celebration of the vibrant nightlife in Stone Town, Zanzibar.',
-            licenseFee: 50000,
-            licenseTerms: 'No political use, credit required',
-            licenseCount: 5,
-            cosotaCommissionPercentage: 15,
-            lyrics: `Verse 1:
-Stone Town alleys come alive
-As the sun begins to dive
-Spice markets close their doors
-While music rises from the shores
-
-Chorus:
-Zanzibar nights, dancing under stars
-Zanzibar nights, rhythm of our hearts
-Zanzibar nights, where cultures blend as one
-The magic's only just begun
-
-Verse 2:
-Ocean breeze carries the sound
-Of taarab music all around
-Hands clapping, voices high
-Beneath the velvet island sky
-
-[Chorus]
-
-Bridge:
-History whispers through these streets
-Where different worlds and cultures meet
-In harmony we find our way
-As night transforms another day
-
-[Chorus]
-
-Outro:
-Zanzibar nights, memories we'll keep
-Long after the island falls asleep`,
-            collaborators: 'Featuring vocals by Maria Joseph',
-            status: 'copyrighted',
-            submittedAt: '2025-05-10T14:20:00Z',
-            approvedAt: '2025-05-12T09:30:00Z',
-            blockchainTxHash: '0x7d8f3e2c1a5b9d6f4c2e8a7b3d5f2e1c9b8a7d6f3e2c1a5b9d6f4c2e8a7b3d5f',
-            isAvailableForLicensing: true,
-            audioFileName: 'zanzibar_nights.mp3'
-          });
-        } else if (trackId === '3') {
-          setTrack({
-            id: '3',
-            title: 'Kilimanjaro Dreams',
-            genre: 'Taarab',
-            releaseYear: '2025',
-            description: 'A musical journey inspired by climbing Mount Kilimanjaro.',
-            lyrics: `Verse 1:
-Standing at the base, looking up so high
-Africa's rooftop touching the sky
-The journey ahead seems so steep
-But dreams of the summit I keep
-
-Chorus:
-Kilimanjaro dreams, calling me to climb
-Kilimanjaro dreams, one step at a time
-Through forest and alpine, to glaciers above
-This mountain captures my heart and my love
-
-Verse 2:
-Breathless and weary, I continue on
-From midnight till the break of dawn
-Stars guide my path through the night
-Until I reach the morning light
-
-[Chorus]
-
-Bridge:
-Uhuru Peak in the distance gleams
-The culmination of all my dreams
-The struggle and pain fade away
-As I greet the new day
-
-[Chorus]
-
-Outro:
-Kilimanjaro dreams, now reality
-The roof of Africa, has changed me`,
-            collaborators: 'Percussion by Robert Mbuki',
-            status: 'pending',
-            submittedAt: '2025-05-20T09:15:00Z',
-            isAvailableForLicensing: false,
-            audioFileName: 'kilimanjaro_dreams.mp3'
-          });
-        } else if (trackId === '4') {
-          setTrack({
-            id: '4',
-            title: 'Dar es Salaam Groove',
-            genre: 'Hip Hop',
-            releaseYear: '2023',
-            description: 'An urban anthem celebrating life in Tanzania\'s largest city.',
-            lyrics: `Verse 1:
-City lights reflecting in the harbor bay
-Hustle and bustle of another day
-From Kariakoo to Oyster Bay
-Dar es Salaam has something to say
-
-Chorus:
-Dar es Salaam groove, feel the city's beat
-Dar es Salaam groove, life is bittersweet
-From sunrise to sunset, we're on our feet
-In this concrete jungle where all cultures meet
-
-Verse 2:
-Daladalas weaving through the crowded streets
-While vendors sell their wares in the midday heat
-Languages blend in a beautiful sound
-As people from all walks of life gather around
-
-[Chorus]
-
-Bridge:
-City of Peace, that's what they call you
-A melting pot of old and new
-Despite the challenges that we face
-You move forward at your own pace
-
-[Chorus]
-
-Outro:
-Dar es Salaam groove, in my heart you stay
-No matter how far I roam away`,
-            collaborators: 'Featuring local street musicians',
-            status: 'rejected',
-            submittedAt: '2025-05-05T11:45:00Z',
-            rejectionReason: 'Insufficient documentation of ownership. Please provide proof that you are the original creator of this work.',
-            isAvailableForLicensing: false,
-            audioFileName: 'dar_es_salaam_groove.mp3'
-          });
-        } else {
-          setError('Track not found');
+        const { ApiService } = await import('../../services/apiService');
+        const api = new ApiService({ getToken: () => localStorage.getItem('token') });
+        if (!trackId) {
+          setError('Track ID not provided.');
+          setIsLoading(false);
+          return;
         }
+        const data = await api.getTrackById(trackId);
+        setTrack(data);
       } catch (err) {
-        setError('Failed to load track details');
+        setError('Track not found or failed to load.');
+        setTrack(null);
       } finally {
         setIsLoading(false);
       }
     };
-    
     fetchTrack();
   }, [trackId]);
 

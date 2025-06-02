@@ -35,71 +35,20 @@ const MyTracks: React.FC = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the artist's tracks
-    // For demo purposes, we'll use mock data
     const fetchTracks = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setTracks([
-        {
-          id: '1',
-          title: 'Serengeti Sunset',
-          genre: 'Bongo Flava',
-          releaseYear: '2025',
-          status: 'approved',
-          submittedAt: '2025-05-15T10:30:00Z',
-          isAvailableForLicensing: true,
-          licenseFee: 75000,
-          licenseTerms: 'Commercial use requires proper attribution',
-          licenseCount: 2
-        },
-        {
-          id: '2',
-          title: 'Zanzibar Nights',
-          genre: 'Afrobeat',
-          releaseYear: '2024',
-          status: 'copyrighted',
-          submittedAt: '2025-05-10T14:20:00Z',
-          isAvailableForLicensing: true,
-          licenseFee: 50000,
-          licenseTerms: 'No political use, credit required',
-          licenseCount: 5
-        },
-        {
-          id: '3',
-          title: 'Kilimanjaro Dreams',
-          genre: 'Taarab',
-          releaseYear: '2025',
-          status: 'pending',
-          submittedAt: '2025-05-20T09:15:00Z',
-          isAvailableForLicensing: false
-        },
-        {
-          id: '4',
-          title: 'Dar es Salaam Groove',
-          genre: 'Hip Hop',
-          releaseYear: '2023',
-          status: 'rejected',
-          submittedAt: '2025-05-05T11:45:00Z',
-          isAvailableForLicensing: false
-        },
-        {
-          id: '5',
-          title: 'African Sunrise',
-          genre: 'Gospel',
-          releaseYear: '2024',
-          status: 'approved',
-          submittedAt: '2025-04-28T08:30:00Z',
-          isAvailableForLicensing: true,
-          licenseFee: 30000,
-          licenseTerms: 'For non-profit and commercial use',
-          licenseCount: 1
-        }
-      ]);
-      
-      setIsLoading(false);
+      setIsLoading(true);
+      try {
+        const { ApiService } = await import('../../services/apiService');
+        const api = new ApiService({ getToken: () => localStorage.getItem('token') });
+        const data = await api.getMyTracks();
+        setTracks(data);
+      } catch (err) {
+        // Optionally: set an error state if you want to show error UI
+        setTracks([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    
     fetchTracks();
   }, []);
 
