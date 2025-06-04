@@ -11,7 +11,6 @@ import {
   FiChevronLeft
 } from 'react-icons/fi';
 import { ApiService } from '../../services/apiService';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface Track {
   id: string;
@@ -41,7 +40,6 @@ const RequestLicense: React.FC = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const preselectedTrackId = queryParams.get('trackId');
-  const { currentUser } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -71,17 +69,11 @@ const RequestLicense: React.FC = () => {
       try {
         setIsLoading(true);
         const tracks = await apiService.getAvailableTracksForLicensing();
-        
-        // Filter out tracks owned by the current user
-        const filteredTracks = currentUser ? 
-          tracks.filter((track: Track) => track.artist?.id !== currentUser.id) : 
-          tracks;
-        
-        setAvailableTracks(filteredTracks);
+        setAvailableTracks(tracks);
         
         // If there's a preselected track, set it
         if (preselectedTrackId) {
-          const track = filteredTracks.find((t: Track) => t.id === preselectedTrackId);
+          const track = tracks.find((t: Track) => t.id === preselectedTrackId);
           if (track) {
             setSelectedTrack(track);
           }
@@ -220,24 +212,6 @@ const RequestLicense: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="flex flex-col justify-center items-center min-h-[calc(100vh-200px)] text-center"
-      >
-        <svg className="animate-spin h-10 w-10 text-cosota mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p className="text-lg font-medium text-gray-700 dark:text-gray-300">Loading available tracks...</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Please wait a moment.</p>
-      </motion.div>
-    );
-  }
-
   if (isSuccess) {
     return (
       <motion.div
@@ -369,7 +343,7 @@ const RequestLicense: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="focus:ring-cosota focus:border-cosota block w-full h-10 pl-10 sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="focus:ring-cosota focus:border-cosota block w-full pl-10 sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     placeholder="Search by title, artist, or genre..."
                   />
                 </div>
@@ -413,9 +387,7 @@ const RequestLicense: React.FC = () => {
                                   `${track.artist.firstName} ${track.artist.lastName}` : 
                                   'Unknown Artist'}
                                 {track.genre ? ` • ${track.genre}` : ''}
-                                {track.releaseYear ? ` • ${track.releaseYear}` : ''}</div>
-                              <div className="text-sm font-medium text-cosota mt-1">
-                                License Fee: {track.licenseFee ? `${Number(track.licenseFee / 1000).toFixed(2)}` : 'Contact for pricing'}
+                                {track.releaseYear ? ` • ${track.releaseYear}` : ''}
                               </div>
                             </div>
                           </div>
@@ -442,9 +414,7 @@ const RequestLicense: React.FC = () => {
                                   `${track.artist.firstName} ${track.artist.lastName}` : 
                                   'Unknown Artist'}
                                 {track.genre ? ` • ${track.genre}` : ''}
-                                {track.releaseYear ? ` • ${track.releaseYear}` : ''}</div>
-                              <div className="text-sm font-medium text-cosota mt-1">
-                                License Fee: {track.licenseFee ? `${Number(track.licenseFee / 1000).toFixed(2)}` : 'Contact for pricing'}
+                                {track.releaseYear ? ` • ${track.releaseYear}` : ''}
                               </div>
                             </div>
                           </div>
@@ -472,7 +442,7 @@ const RequestLicense: React.FC = () => {
                       {selectedTrack.releaseYear ? ` • ${selectedTrack.releaseYear}` : ''}
                     </div>
                     <div className="text-sm font-medium text-cosota mt-1">
-                      License Fee: {selectedTrack.licenseFee ? `${selectedTrack.licenseFee.toLocaleString()} TZS` : 'Contact for pricing'}
+                      License Fee: {selectedTrack.licenseFee ? `$${(selectedTrack.licenseFee / 1000).toFixed(2)}` : 'Contact for pricing'}
                     </div>
                   </div>
                   <button

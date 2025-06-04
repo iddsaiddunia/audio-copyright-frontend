@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { usePayment } from '../../contexts/PaymentContext';
+import { ApiService } from '../../services/apiService';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   FiMusic, 
   FiFilter, 
@@ -52,12 +54,18 @@ interface Track {
 }
 
 const CopyrightPublishing: React.FC = () => {
+  const auth = useAuth();
+  // Create API service with a function that gets the token from localStorage
+  const api = new ApiService({ 
+    getToken: () => localStorage.getItem('token') || '' 
+  });
   // State management
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('approved');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [genreFilter, setGenreFilter] = useState<string>('all');
+  // Year filter removed as requested
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -105,24 +113,32 @@ const CopyrightPublishing: React.FC = () => {
       setIsLoading(true);
       
       try {
-        // Simulate API call with timeout
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const response = await api.getAllTracks();
         
-        // Mock data for demonstration
-        setTracks([
-          {
-            id: '1',
-            title: 'Serengeti Sunset',
-            artist: {
-              id: '1',
-              name: 'John Doe'
-            },
-            genre: 'Bongo Flava',
-            releaseYear: '2025',
-            approvedAt: '2025-05-18T14:30:00Z',
-            status: 'approved',
-            description: 'A song inspired by the beautiful sunsets of the Serengeti plains.'
+        // Transform the response data to match our Track interface if needed
+        const formattedTracks = response.map((track: any) => ({
+          id: track.id,
+          title: track.title,
+          artist: {
+            id: track.artist?.id || '',
+            name: track.artist?.firstName && track.artist?.lastName ? 
+              `${track.artist.firstName} ${track.artist.lastName}` : 
+              track.artist?.email || 'Unknown Artist'
           },
+          genre: track.genre || 'Unknown',
+          releaseYear: track.releaseYear || '',
+          approvedAt: track.approvedAt || '',
+          status: track.status || 'pending',
+          blockchainTxHash: track.blockchainTxHash,
+          blockchainTimestamp: track.blockchainTimestamp,
+          description: track.description
+        }));
+        
+        setTracks(formattedTracks);
+      } catch (error) {
+        console.error('Failed to fetch tracks:', error);
+        // Fallback to mock data for development/testing
+        setTracks([
           {
             id: '2',
             title: 'Zanzibar Nights',
@@ -152,8 +168,6 @@ const CopyrightPublishing: React.FC = () => {
             description: 'A musical journey inspired by climbing Mount Kilimanjaro.'
           }
         ]);
-      } catch (err) {
-        console.error('Failed to fetch tracks', err);
       } finally {
         setIsLoading(false);
       }
@@ -331,22 +345,17 @@ const CopyrightPublishing: React.FC = () => {
   const filteredTracks = tracks
     .filter(track => {
       // Apply search filter
-      if (searchQuery && !track.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !track.artist.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
+      const matchesSearch = searchQuery === '' || 
+        track.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        track.artist.name.toLowerCase().includes(searchQuery.toLowerCase());
       
       // Apply status filter
-      if (statusFilter !== 'all' && track.status !== statusFilter) {
-        return false;
-      }
+      const matchesStatus = statusFilter === 'all' || track.status === statusFilter;
       
       // Apply genre filter
-      if (genreFilter !== 'all' && track.genre !== genreFilter) {
-        return false;
-      }
+      const matchesGenre = genreFilter === 'all' || track.genre === genreFilter;
       
-      return true;
+      return matchesSearch && matchesStatus && matchesGenre;
     })
     .sort((a, b) => new Date(b.approvedAt).getTime() - new Date(a.approvedAt).getTime());
 
@@ -368,16 +377,16 @@ const CopyrightPublishing: React.FC = () => {
         <div className="px-4 py-5 sm:p-6">
           {/* Search and Filter Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 mb-4">
-            <div className="relative rounded-md shadow-sm w-full sm:w-64">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            <div className="search-container">
+              <div className="search-icon">
+                <FiSearch className="h-5 w-5" aria-hidden="true" />
               </div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="focus:ring-cosota focus:border-cosota block w-full pl-10 sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="Search tracks..."
+                className="search-box"
+                placeholder="Search by title or artist..."
               />
             </div>
             
@@ -411,8 +420,10 @@ const CopyrightPublishing: React.FC = () => {
                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
                   >
                     <option value="all">All Statuses</option>
-                    <option value="approved">Ready to Publish</option>
-                    <option value="blockchain">Published on Blockchain</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="copyrighted">Copyrighted</option>
                   </select>
                 </div>
                 

@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FiDollarSign, FiInfo, FiSave, FiAlertTriangle, FiCheck } from 'react-icons/fi';
+import { FiDollarSign, FiInfo, FiSave, FiAlertTriangle, FiCheck, FiBarChart2, FiList, FiCheckSquare, FiRefreshCw } from 'react-icons/fi';
+import axios from 'axios';
+// We're still importing useAuth for future use
+import { useAuth } from '../../contexts/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 interface Track {
   id: string;
@@ -10,79 +15,99 @@ interface Track {
   isAvailableForLicensing: boolean;
   licenseFee?: number;
   licenseTerms?: string;
+  selected?: boolean; // For bulk actions
+}
+
+interface LicenseTemplate {
+  name: string;
+  fee: number;
+  terms: string;
+}
+
+interface LicenseAnalytics {
+  totalTracks: number;
+  availableForLicensing: number;
+  averageLicenseFee: number;
+  tracksWithoutFee: number;
 }
 
 interface LicenseSettingsProps {
-  cosotaCommissionPercentage: number;
+  cosotaCommissionPercentage?: number;
 }
 
 const LicenseSettings: React.FC<LicenseSettingsProps> = ({ cosotaCommissionPercentage = 15 }) => {
+  // We'll keep useAuth for future use but not use currentUser directly
+  useAuth();
+  
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [defaultLicenseFee, setDefaultLicenseFee] = useState<number>(50000);
   const [defaultLicenseTerms, setDefaultLicenseTerms] = useState<string>(
     'For commercial use with proper attribution required.'
   );
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState<LicenseAnalytics | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [selectedTracksIds, setSelectedTracksIds] = useState<string[]>([]);
+  
+  // License templates for common use cases
+  const licenseTemplates: LicenseTemplate[] = [
+    { 
+      name: 'Standard Commercial', 
+      fee: 50000, 
+      terms: 'For commercial use with proper attribution required.' 
+    },
+    { 
+      name: 'Non-Profit', 
+      fee: 20000, 
+      terms: 'For non-profit organizations only with attribution.' 
+    },
+    { 
+      name: 'Premium', 
+      fee: 100000, 
+      terms: 'Exclusive commercial rights for limited period.' 
+    }
+  ];
+
+  // Function to fetch analytics data - defined outside useEffect for reuse
+  const fetchAnalytics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/license-settings/analytics`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAnalytics(response.data);
+    } catch (err) {
+      console.error('Error fetching license analytics:', err);
+    }
+  };
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the artist's tracks
-    // For demo purposes, we'll use mock data
     const fetchTracks = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setTracks([
-        {
-          id: '1',
-          title: 'Serengeti Sunset',
-          genre: 'Bongo Flava',
-          status: 'approved',
-          isAvailableForLicensing: true,
-          licenseFee: 75000,
-          licenseTerms: 'Commercial use requires proper attribution'
-        },
-        {
-          id: '2',
-          title: 'Zanzibar Nights',
-          genre: 'Afrobeat',
-          status: 'copyrighted',
-          isAvailableForLicensing: true,
-          licenseFee: 50000,
-          licenseTerms: 'No political use, credit required'
-        },
-        {
-          id: '3',
-          title: 'Kilimanjaro Dreams',
-          genre: 'Taarab',
-          status: 'pending',
-          isAvailableForLicensing: false
-        },
-        {
-          id: '4',
-          title: 'Dar es Salaam Groove',
-          genre: 'Hip Hop',
-          status: 'rejected',
-          isAvailableForLicensing: false
-        },
-        {
-          id: '5',
-          title: 'African Sunrise',
-          genre: 'Gospel',
-          status: 'approved',
-          isAvailableForLicensing: true,
-          licenseFee: 30000,
-          licenseTerms: 'For non-profit and commercial use'
-        }
-      ]);
-      
-      setIsLoading(false);
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/api/license-settings`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setTracks(response.data.map((track: Track) => ({ ...track, selected: false })));
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching license settings:', err);
+        setError('Failed to load your tracks. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     fetchTracks();
+    fetchAnalytics();
   }, []);
 
-  const handleTrackChange = (id: string, field: string, value: any) => {
+  const handleTrackChange = (id: string, field: string, value: string | number | boolean) => {
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === id ? { ...track, [field]: value } : track
@@ -90,19 +115,111 @@ const LicenseSettings: React.FC<LicenseSettingsProps> = ({ cosotaCommissionPerce
     );
   };
 
+  const handleTemplateChange = (templateName: string) => {
+    setSelectedTemplate(templateName);
+    
+    if (templateName) {
+      const template = licenseTemplates.find(t => t.name === templateName);
+      if (template) {
+        setDefaultLicenseFee(template.fee);
+        setDefaultLicenseTerms(template.terms);
+      }
+    }
+  };
+  
+  const handleTrackSelection = (id: string, selected: boolean) => {
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        track.id === id ? { ...track, selected } : track
+      )
+    );
+    
+    setSelectedTracksIds(prev => {
+      if (selected) {
+        return [...prev, id];
+      } else {
+        return prev.filter(trackId => trackId !== id);
+      }
+    });
+  };
+  
+  const applyBulkSettings = () => {
+    if (selectedTracksIds.length === 0) {
+      setError('Please select at least one track');
+      return;
+    }
+    
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        selectedTracksIds.includes(track.id) ? {
+          ...track,
+          licenseFee: defaultLicenseFee,
+          licenseTerms: defaultLicenseTerms,
+          isAvailableForLicensing: true
+        } : track
+      )
+    );
+    
+    setError(null);
+  };
+  
+  const toggleAnalytics = () => {
+    setShowAnalytics(prev => !prev);
+  };
+  
+  // This is the main save function that will be used by the save button
   const handleSaveSettings = async () => {
     setIsSaving(true);
+    setSaveSuccess(false);
+    setError(null);
     
-    // In a real app, this would be an API call to save the settings
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setSaveSuccess(true);
-    setIsSaving(false);
-    
-    // Reset success message after 3 seconds
-    setTimeout(() => {
-      setSaveSuccess(false);
-    }, 3000);
+    try {
+      // Save individual track settings
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // If we have selected tracks, use bulk update
+      if (selectedTracksIds.length > 0) {
+        const selectedTracks = tracks.filter(track => selectedTracksIds.includes(track.id));
+        const bulkUpdateData = selectedTracks.map(track => ({
+          id: track.id,
+          isAvailableForLicensing: track.isAvailableForLicensing,
+          licenseFee: track.licenseFee,
+          licenseTerms: track.licenseTerms
+        }));
+        
+        await axios.put(`${API_BASE_URL}/api/license-settings/bulk/update`, bulkUpdateData, { headers });
+      } else {
+        // Otherwise update each modified track individually
+        const updatePromises = tracks.map(track => 
+          axios.put(`${API_BASE_URL}/api/license-settings/${track.id}`, {
+            isAvailableForLicensing: track.isAvailableForLicensing,
+            licenseFee: track.licenseFee,
+            licenseTerms: track.licenseTerms
+          }, { headers })
+        );
+        
+        await Promise.all(updatePromises);
+      }
+      
+      // Refresh analytics after save
+      const analyticsResponse = await axios.get(`${API_BASE_URL}/api/license-settings/analytics`, { headers });
+      setAnalytics(analyticsResponse.data);
+      
+      setSaveSuccess(true);
+    } catch (err) {
+      console.error('Error saving license settings:', err);
+      setError('Failed to save license settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+      
+      // Reset success message after 3 seconds
+      if (saveSuccess) {
+        setTimeout(() => {
+          setSaveSuccess(false);
+        }, 3000);
+      }
+    }
   };
 
   const applyDefaultSettings = () => {
@@ -153,6 +270,48 @@ const LicenseSettings: React.FC<LicenseSettingsProps> = ({ cosotaCommissionPerce
         </div>
       </div>
 
+      {/* License Analytics */}
+      <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-6">
+        <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">License Analytics</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+              Overview of your licensing metrics
+            </p>
+          </div>
+          <button 
+            onClick={toggleAnalytics}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+          >
+            <FiBarChart2 className="-ml-1 mr-2 h-4 w-4" />
+            {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+          </button>
+        </div>
+        
+        {showAnalytics && analytics && (
+          <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded shadow">
+                <div className="text-sm text-gray-500 dark:text-gray-400">Total Tracks</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.totalTracks}</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded shadow">
+                <div className="text-sm text-gray-500 dark:text-gray-400">Available for Licensing</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.availableForLicensing}</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded shadow">
+                <div className="text-sm text-gray-500 dark:text-gray-400">Average License Fee</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.averageLicenseFee.toLocaleString()} TZS</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded shadow">
+                <div className="text-sm text-gray-500 dark:text-gray-400">Tracks Without Fee</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{analytics.tracksWithoutFee}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
       {/* Default Settings */}
       <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
@@ -161,6 +320,24 @@ const LicenseSettings: React.FC<LicenseSettingsProps> = ({ cosotaCommissionPerce
             <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
               Set default values for all your tracks
             </p>
+          </div>
+          
+          {/* License Templates Dropdown */}
+          <div className="flex items-center">
+            <label htmlFor="licenseTemplate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">
+              Templates:
+            </label>
+            <select
+              id="licenseTemplate"
+              className="focus:ring-cosota focus:border-cosota block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              value={selectedTemplate}
+              onChange={(e) => handleTemplateChange(e.target.value)}
+            >
+              <option value="">Select a template</option>
+              {licenseTemplates.map(template => (
+                <option key={template.name} value={template.name}>{template.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
@@ -220,6 +397,71 @@ const LicenseSettings: React.FC<LicenseSettingsProps> = ({ cosotaCommissionPerce
         </div>
       </div>
 
+      {/* Bulk Actions */}
+      <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-6">
+        <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Bulk Actions</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+              Apply settings to multiple tracks at once
+            </p>
+          </div>
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={applyBulkSettings}
+              disabled={selectedTracksIds.length === 0}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FiCheckSquare className="-ml-1 mr-2 h-5 w-5" />
+              Apply Settings to Selected ({selectedTracksIds.length})
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setTracks(prevTracks => prevTracks.map(track => ({ ...track, selected: true })));
+                setSelectedTracksIds(tracks.map(track => track.id));
+              }}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+            >
+              <FiList className="-ml-1 mr-2 h-5 w-5" />
+              Select All
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setTracks(prevTracks => prevTracks.map(track => ({ ...track, selected: false })));
+                setSelectedTracksIds([]);
+              }}
+              disabled={selectedTracksIds.length === 0}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+            >
+              Clear Selection
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                fetchAnalytics();
+              }}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+            >
+              <FiRefreshCw className="-ml-1 mr-2 h-5 w-5" />
+              Refresh Analytics
+            </button>
+          </div>
+          {error && (
+            <div className="mt-3 text-sm text-red-600 dark:text-red-400">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+      
       {/* Track-specific settings */}
       <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6">
@@ -230,12 +472,23 @@ const LicenseSettings: React.FC<LicenseSettingsProps> = ({ cosotaCommissionPerce
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700">
           {tracks.filter(track => track.status === 'approved' || track.status === 'copyrighted').map((track, index) => (
-            <div 
-              key={track.id}
+            <div key={track.id}
               className={`px-4 py-5 sm:px-6 ${
                 index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'
               }`}
             >
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id={`select-${track.id}`}
+                  checked={!!track.selected}
+                  onChange={(e) => handleTrackSelection(track.id, e.target.checked)}
+                  className="h-4 w-4 mr-2 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
+                />
+                <label htmlFor={`select-${track.id}`} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Select for bulk actions
+                </label>
+              </div>
               <div className="flex flex-col sm:flex-row sm:items-start">
                 <div className="flex-1 mb-4 sm:mb-0">
                   <h4 className="text-md font-medium text-gray-900 dark:text-white">{track.title}</h4>

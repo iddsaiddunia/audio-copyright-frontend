@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { User } from '../types/auth';
 import { hasPermission, hasRole, isAdmin } from '../utils/permissions';
 
-interface AuthContextType {
+export interface AuthContextType {
   currentUser: User | null;
   isLoading: boolean;
   hasPermission: (action: string) => boolean;
@@ -13,7 +13,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;

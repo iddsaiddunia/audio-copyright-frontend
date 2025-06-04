@@ -66,24 +66,39 @@ const TrackApprovals: React.FC = () => {
       try {
         // Fetch all tracks for admin
         const response = await apiService.getAllTracks();
+        
+        // Debug: Log raw API response
+        console.log('Raw API response for tracks:', response);
+        
         // Map response to Track interface, including artist name and payment status
-        const mapped = response.map((track: any) => ({
-          id: track.id,
-          title: track.title,
-          artist: {
-            id: track.artist?.id || '',
-            name: track.artist ? `${track.artist.firstName || ''} ${track.artist.lastName || ''}`.trim() : 'Unknown',
-          },
-          genre: track.genre,
-          releaseYear: track.releaseYear,
-          submittedAt: track.createdAt || track.submittedAt || '',
-          status: track.status || (track.isVerified ? 'approved' : 'pending'),
-          description: track.description,
-          lyrics: track.lyrics,
-          audioFileName: track.filename || track.audioFileName,
-          isAvailableForLicensing: track.isAvailableForLicensing,
-          paymentStatus: track.paymentStatus || (track.payment ? track.payment.status : undefined),
-        }));
+        const mapped = response.map((track: any) => {
+          // Debug: Log individual track data
+          console.log('Processing track:', {
+            id: track.id,
+            title: track.title,
+            paymentStatus: track.paymentStatus,
+            paymentData: track.payments,
+            status: track.status
+          });
+          
+          return {
+            id: track.id,
+            title: track.title,
+            artist: {
+              id: track.artist?.id || '',
+              name: track.artist ? `${track.artist.firstName || ''} ${track.artist.lastName || ''}`.trim() : 'Unknown',
+            },
+            genre: track.genre,
+            releaseYear: track.releaseYear,
+            submittedAt: track.createdAt || track.submittedAt || '',
+            status: track.status || (track.isVerified ? 'approved' : 'pending'),
+            description: track.description,
+            lyrics: track.lyrics,
+            audioFileName: track.filename || track.audioFileName,
+            isAvailableForLicensing: track.isAvailableForLicensing,
+            paymentStatus: track.paymentStatus || (track.payment ? track.payment.status : undefined),
+          };
+        });
         setTracks(mapped);
       } catch (err) {
         console.error('Failed to fetch tracks', err);
@@ -187,19 +202,54 @@ const TrackApprovals: React.FC = () => {
   const handleApprove = async () => {
     if (!selectedTrack) return;
     
+    // Check if track is already in a final state
+    if (selectedTrack.status === 'approved' || selectedTrack.status === 'copyrighted') {
+      alert(`This track is already in '${selectedTrack.status}' status and cannot be approved again.`);
+      return;
+    }
+    
+    // Debug payment verification
+    const isVerified = isPaymentVerified(selectedTrack.id, 'track');
+    const isPending = isPendingVerification(selectedTrack.id, 'track');
+    const allPaymentRecords = JSON.parse(localStorage.getItem('paymentRecords') || '[]');
+    
+    console.log('Payment verification debug:', {
+      trackId: selectedTrack.id,
+      trackStatus: selectedTrack.status,
+      isVerified,
+      isPending,
+      allPaymentRecords
+    });
+    
     // Check if payment has been verified
     if (!isPaymentVerified(selectedTrack.id, 'track')) {
-      alert('This track cannot be approved until payment has been verified by the Financial Administrator.');
-      return;
+      // Check if the track has payment data from the API
+      if (selectedTrack.paymentStatus === 'approved') {
+        console.log('Track has approved payment in API but not in local storage. Adding to local storage...');
+        // Add the payment record to localStorage
+        const newPaymentRecord = {
+          entityId: selectedTrack.id,
+          entityType: 'track' as const,
+          isPaid: true,
+          verificationStatus: 'verified' as const,
+          amount: 100 // Default amount
+        };
+        allPaymentRecords.push(newPaymentRecord);
+        localStorage.setItem('paymentRecords', JSON.stringify(allPaymentRecords));
+        // Continue with approval
+      } else {
+        alert('This track cannot be approved until payment has been verified by the Financial Administrator.');
+        return;
+      }
     }
     
     setIsProcessing(true);
     
     try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Make real API call to approve the track
+      await apiService.approveTrack(selectedTrack.id);
       
-      // Update track status
+      // Update track status in local state
       const updatedTracks = tracks.map(track => {
         if (track.id === selectedTrack.id) {
           return {
@@ -213,8 +263,16 @@ const TrackApprovals: React.FC = () => {
       setTracks(updatedTracks);
       setIsModalOpen(false);
       setSelectedTrack(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error approving track:', error);
+      
+      // Display more detailed error message
+      let errorMessage = 'Failed to approve track. Please try again.';
+      if (error.response && error.response.data && error.response.data.error) {
+        errorMessage = `Error: ${error.response.data.error}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -232,8 +290,9 @@ const TrackApprovals: React.FC = () => {
       setIsProcessing(true);
       
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Make real API call to reject the track
+        // We should ideally update the API to accept a rejection reason
+        await apiService.rejectTrack(selectedTrack.id);
         
         // Update track status locally
         setTracks(prevTracks => 
@@ -249,8 +308,16 @@ const TrackApprovals: React.FC = () => {
         setSelectedTrack(null);
         setIsRejecting(false);
         setRejectionReason('');
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to reject track', err);
+        
+        // Display more detailed error message
+        let errorMessage = 'Failed to reject track. Please try again.';
+        if (err.response && err.response.data && err.response.data.error) {
+          errorMessage = `Error: ${err.response.data.error}`;
+        }
+        
+        alert(errorMessage);
       } finally {
         setIsProcessing(false);
       }
@@ -496,28 +563,6 @@ const TrackApprovals: React.FC = () => {
                         >
                           View Details
                         </button>
-                        {(track.paymentStatus === 'approved' || track.paymentStatus === 'verified') && track.status === 'pending' && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => { setSelectedTrack(track); setIsModalOpen(true); }}
-                              className="ml-2 inline-flex items-center px-3 py-1 border border-green-600 text-green-800 dark:text-green-300 rounded hover:bg-green-50 dark:hover:bg-green-900"
-                              disabled={isProcessing}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setSelectedTrack(track); setIsModalOpen(true); setIsRejecting(true); }}
-                              className="ml-2 inline-flex items-center px-3 py-1 border border-red-600 text-red-800 dark:text-red-300 rounded hover:bg-red-50 dark:hover:bg-red-900"
-                              disabled={isProcessing}
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {/* If paymentStatus is not verified/approved, do not show any action buttons */}
-
                       </td>
                     </tr>
                   ))}
@@ -668,7 +713,15 @@ const TrackApprovals: React.FC = () => {
                               disabled={isProcessing}
                               className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
                             >
-                              Approve
+                              {isProcessing ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </>
+                              ) : 'Approve'}
                             </button>
                             <button
                               type="button"
@@ -676,7 +729,15 @@ const TrackApprovals: React.FC = () => {
                               disabled={isProcessing}
                               className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                             >
-                              Reject
+                              {isProcessing ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </>
+                              ) : 'Reject'}
                             </button>
                           </>
                         ) : (

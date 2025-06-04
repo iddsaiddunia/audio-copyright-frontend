@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   FiFileText, 
@@ -11,141 +11,61 @@ import {
   FiX,
   FiMusic,
   FiArrowRight,
-  FiArrowLeft
+  FiArrowLeft,
+  FiRefreshCw,
+  FiExternalLink,
+  FiDownload
 } from 'react-icons/fi';
-
-interface License {
-  id: string;
-  trackId: string;
-  trackTitle: string;
-  licensee: string;
-  licenseeEmail: string;
-  purpose: string;
-  requestedAt: string;
-  status: 'pending' | 'approved' | 'rejected';
-  responseDate?: string;
-  fee?: number;
-}
-
-interface OutgoingLicense {
-  id: string;
-  trackId: string;
-  trackTitle: string;
-  artistName: string;
-  purpose: string;
-  requestedAt: string;
-  status: 'pending' | 'approved' | 'rejected';
-  responseDate?: string;
-  fee?: number;
-}
+// Auth context is used indirectly through localStorage token
+import { ApiService } from '../../services/apiService';
+import type { License } from '../../types/license';
 
 const MyLicenses: React.FC = () => {
+    // Auth context is only used for token retrieval in apiService
   const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>('incoming');
-  const [incomingLicenses, setIncomingLicenses] = useState<License[]>([]);
-  const [outgoingLicenses, setOutgoingLicenses] = useState<OutgoingLicense[]>([]);
+  
+  // State for licenses
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'track' | 'date'>('date');
+  const [sortBy, setSortBy] = useState<'date' | 'track'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [selectedLicense, setSelectedLicense] = useState<License | OutgoingLicense | null>(null);
+  const [selectedLicense, setSelectedLicense] = useState<License | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState('');
+  
+  // State for licenses data
+  const [incomingLicenses, setIncomingLicenses] = useState<License[]>([]);
+  const [outgoingLicenses, setOutgoingLicenses] = useState<License[]>([]);
+  const [payments, setPayments] = useState<Record<string, any>>({});
+  
+  const apiService = new ApiService({
+    getToken: () => localStorage.getItem('token') || ''
+  });
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the license requests
-    // For demo purposes, we'll use mock data
     const fetchLicenses = async () => {
       setIsLoading(true);
       
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch licenses where the current user is the owner (incoming requests)
+        const incomingLicensesData = await apiService.getUserLicenses('owner');
+        setIncomingLicenses(incomingLicensesData);
         
-        // Incoming licenses (requests from others to use the artist's tracks)
-        setIncomingLicenses([
-          {
-            id: '1',
-            trackId: '2',
-            trackTitle: 'Zanzibar Nights',
-            licensee: 'Coastal Hotels Ltd',
-            licenseeEmail: 'events@coastalhotels.co.tz',
-            purpose: 'Background music for hotel lobby and restaurant areas',
-            requestedAt: '2025-05-21T16:30:00Z',
-            status: 'pending'
-          },
-          {
-            id: '2',
-            trackId: '1',
-            trackTitle: 'Serengeti Sunset',
-            licensee: 'TBC Radio',
-            licenseeEmail: 'music@tbcradio.co.tz',
-            purpose: 'Radio broadcast during evening program',
-            requestedAt: '2025-05-18T11:45:00Z',
-            status: 'approved',
-            responseDate: '2025-05-19T09:20:00Z'
-          },
-          {
-            id: '3',
-            trackId: '2',
-            trackTitle: 'Zanzibar Nights',
-            licensee: 'Tanzania Tourism Board',
-            licenseeEmail: 'marketing@tanzaniatourism.go.tz',
-            purpose: 'Background music for promotional video',
-            requestedAt: '2025-05-15T14:10:00Z',
-            status: 'rejected',
-            responseDate: '2025-05-16T10:35:00Z'
-          },
-          {
-            id: '4',
-            trackId: '5',
-            trackTitle: 'African Sunrise',
-            licensee: 'Safari Tours Ltd',
-            licenseeEmail: 'info@safaritours.co.tz',
-            purpose: 'Background music for tour videos',
-            requestedAt: '2025-05-10T09:15:00Z',
-            status: 'approved',
-            responseDate: '2025-05-11T13:40:00Z'
-          }
-        ]);
-
-        // Outgoing licenses (requests by the artist to use others' tracks)
-        setOutgoingLicenses([
-          {
-            id: '101',
-            trackId: '201',
-            trackTitle: 'Kilimanjaro Echoes',
-            artistName: 'Maria Samia',
-            purpose: 'Sample for new track production',
-            requestedAt: '2025-05-22T13:20:00Z',
-            status: 'pending',
-            fee: 45000
-          },
-          {
-            id: '102',
-            trackId: '202',
-            trackTitle: 'Dar City Lights',
-            artistName: 'John Kiango',
-            purpose: 'Background music for music video',
-            requestedAt: '2025-05-17T09:45:00Z',
-            status: 'approved',
-            responseDate: '2025-05-18T14:30:00Z',
-            fee: 60000
-          },
-          {
-            id: '103',
-            trackId: '203',
-            trackTitle: 'Savanna Dreams',
-            artistName: 'Elizabeth Masanja',
-            purpose: 'Live performance at concert',
-            requestedAt: '2025-05-10T11:15:00Z',
-            status: 'rejected',
-            responseDate: '2025-05-11T16:20:00Z',
-            fee: 35000
-          }
-        ]);
-      } catch (err) {
-        console.error('Failed to fetch licenses', err);
+        // Fetch licenses where the current user is the requester (outgoing requests)
+        const outgoingLicensesData = await apiService.getUserLicenses('requester');
+        setOutgoingLicenses(outgoingLicensesData);
+        
+        // Fetch payments for the current user
+        await fetchPayments();
+      } catch (error) {
+        console.error('Error fetching licenses:', error);
       } finally {
         setIsLoading(false);
       }
@@ -153,253 +73,285 @@ const MyLicenses: React.FC = () => {
     
     fetchLicenses();
   }, []);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+  
+  // Filter and sort licenses based on user selections
+  const getFilteredLicenses = (licenses: License[]) => {
+    return licenses
+      .filter(license => {
+        // Filter by status
+        if (statusFilter !== 'all' && license.status !== statusFilter) {
+          return false;
+        }
+        
+        // Filter by search query
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          const trackTitle = license.track?.title?.toLowerCase() || '';
+          const requesterName = `${license.requester?.firstName || ''} ${license.requester?.lastName || ''}`.toLowerCase();
+          const ownerName = `${license.owner?.firstName || ''} ${license.owner?.lastName || ''}`.toLowerCase();
+          const purpose = license.purpose.toLowerCase();
+          
+          return (
+            trackTitle.includes(query) ||
+            requesterName.includes(query) ||
+            ownerName.includes(query) ||
+            purpose.includes(query)
+          );
+        }
+        
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'track') {
+          const titleA = a.track?.title || '';
+          const titleB = b.track?.title || '';
+          return sortDirection === 'asc' 
+            ? titleA.localeCompare(titleB)
+            : titleB.localeCompare(titleA);
+        } else { // sort by date
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+      });
   };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <span className="badge-success">Approved</span>;
-      case 'pending':
-        return <span className="badge-warning">Pending</span>;
-      case 'rejected':
-        return <span className="badge-error">Rejected</span>;
-      default:
-        return <span className="badge-secondary">Unknown</span>;
+  
+  const filteredIncomingLicenses = getFilteredLicenses(incomingLicenses);
+  const filteredOutgoingLicenses = getFilteredLicenses(outgoingLicenses);
+  
+  // Handle license approval
+  const handleApproveLicense = async (license: License) => {
+    if (!license.id) return;
+    
+    setIsProcessing(true);
+    try {
+      await apiService.approveLicenseRequest(license.id);
+      // Update the license in the state
+      setIncomingLicenses(prev => 
+        prev.map(item => 
+          item.id === license.id ? { ...item, status: 'approved' } : item
+        )
+      );
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error approving license:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
-
-  const toggleSort = (field: 'track' | 'date') => {
-    if (sortBy === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortDirection('asc');
+  
+  // Handle license rejection
+  const handleRejectLicense = async (license: License) => {
+    if (!license.id || !rejectionReason) return;
+    
+    setIsProcessing(true);
+    try {
+      await apiService.rejectLicenseRequest(license.id, rejectionReason);
+      // Update the license in the state
+      setIncomingLicenses(prev => 
+        prev.map(item => 
+          item.id === license.id ? { ...item, status: 'rejected', rejectionReason } : item
+        )
+      );
+      setIsRejecting(false);
+      setRejectionReason('');
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error rejecting license:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
-
-  const toggleFilter = () => {
-    setIsFilterOpen(!isFilterOpen);
+  
+  // Fetch payments for the current user
+  const fetchPayments = async () => {
+    try {
+      const paymentsData = await apiService.getArtistPayments();
+      
+      // Create a map of licenseId to payment
+      const paymentsMap = paymentsData.reduce((acc: Record<string, any>, payment: any) => {
+        if (payment.licenseId) {
+          acc[payment.licenseId] = payment;
+        }
+        return acc;
+      }, {});
+      
+      setPayments(paymentsMap);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+    }
   };
-
-  const resetFilters = () => {
-    setSearchQuery('');
-    setStatusFilter('all');
-    setSortBy('date');
-    setSortDirection('desc');
+  
+  // Generate invoice for an approved license
+  const handleGenerateInvoice = async (license: License) => {
+    if (!license.id || !payments[license.id]) return;
+    
+    setIsPaymentProcessing(true);
+    setPaymentError('');
+    setPaymentSuccess('');
+    
+    try {
+      const paymentId = payments[license.id].id;
+      
+      // Call API to generate invoice for the payment
+      const response = await apiService.generateInvoice(paymentId);
+      
+      // Update the payment in the state
+      setPayments(prev => ({
+        ...prev,
+        [license.id]: response
+      }));
+      
+      setPaymentSuccess(`Invoice generated successfully. Control Number: ${response.controlNumber}`);
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      setPaymentError('Failed to generate invoice. Please try again.');
+    } finally {
+      setIsPaymentProcessing(false);
+    }
   };
-
-  const handleViewDetails = (license: License | OutgoingLicense) => {
+  
+  // This function has been removed as payment details are now handled in the TrackPayments page
+  
+  // Handle opening the license details modal
+  const handleOpenModal = (license: License) => {
     setSelectedLicense(license);
     setIsModalOpen(true);
   };
-
+  
+  // Handle closing the license details modal
   const handleCloseModal = () => {
-    setIsModalOpen(false);
     setSelectedLicense(null);
+    setIsModalOpen(false);
+    setIsRejecting(false);
+    setRejectionReason('');
   };
-
-  const handleApprove = async () => {
-    if (!selectedLicense) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      // In a real app, this would be an API call to approve the license
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Update the license status in our local state
-      setIncomingLicenses(prevLicenses => 
-        prevLicenses.map(license => 
-          license.id === selectedLicense.id 
-            ? { 
-                ...license, 
-                status: 'approved', 
-                responseDate: new Date().toISOString() 
-              } 
-            : license
-        )
-      );
-      
-      // Close the modal
-      setIsModalOpen(false);
-      setSelectedLicense(null);
-    } catch (err) {
-      console.error('Failed to approve license', err);
-    } finally {
-      setIsProcessing(false);
+  
+  // Format date string
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'paid': return 'bg-blue-100 text-blue-800';
+      case 'published': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-yellow-100 text-yellow-800'; // pending
     }
   };
-
-  const handleReject = async () => {
-    if (!selectedLicense) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      // In a real app, this would be an API call to reject the license
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Update the license status in our local state
-      setIncomingLicenses(prevLicenses => 
-        prevLicenses.map(license => 
-          license.id === selectedLicense.id 
-            ? { 
-                ...license, 
-                status: 'rejected', 
-                responseDate: new Date().toISOString() 
-              } 
-            : license
-        )
-      );
-      
-      // Close the modal
-      setIsModalOpen(false);
-      setSelectedLicense(null);
-    } catch (err) {
-      console.error('Failed to reject license', err);
-    } finally {
-      setIsProcessing(false);
+  
+  // Get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved': return <FiCheck className="inline mr-1" />;
+      case 'rejected': return <FiX className="inline mr-1" />;
+      case 'paid': return <span className="inline mr-1">💰</span>;
+      case 'published': return <span className="inline mr-1">🔗</span>;
+      default: return <span className="inline mr-1">⏳</span>; // pending
     }
   };
-
-  const filteredIncomingLicenses = incomingLicenses
-    .filter(license => {
-      // Apply search filter
-      if (searchQuery && !license.trackTitle.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !license.licensee.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
+  
+  // Refresh licenses and payments
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      const incomingLicensesData = await apiService.getUserLicenses('owner');
+      setIncomingLicenses(incomingLicensesData);
       
-      // Apply status filter
-      if (statusFilter !== 'all' && license.status !== statusFilter) {
-        return false;
-      }
+      const outgoingLicensesData = await apiService.getUserLicenses('requester');
+      setOutgoingLicenses(outgoingLicensesData);
       
-      return true;
-    })
-    .sort((a, b) => {
-      // Apply sorting
-      if (sortBy === 'track') {
-        return sortDirection === 'asc' 
-          ? a.trackTitle.localeCompare(b.trackTitle) 
-          : b.trackTitle.localeCompare(a.trackTitle);
-      } else {
-        return sortDirection === 'asc' 
-          ? new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime() 
-          : new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
-      }
-    });
-
-  const filteredOutgoingLicenses = outgoingLicenses
-    .filter(license => {
-      // Apply search filter
-      if (searchQuery && !license.trackTitle.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !license.artistName.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      
-      // Apply status filter
-      if (statusFilter !== 'all' && license.status !== statusFilter) {
-        return false;
-      }
-      
-      return true;
-    })
-    .sort((a, b) => {
-      // Apply sorting
-      if (sortBy === 'track') {
-        return sortDirection === 'asc' 
-          ? a.trackTitle.localeCompare(b.trackTitle) 
-          : b.trackTitle.localeCompare(a.trackTitle);
-      } else {
-        return sortDirection === 'asc' 
-          ? new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime() 
-          : new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
-      }
-    });
-
-
+      // Refresh payments
+      await fetchPayments();
+    } catch (error) {
+      console.error('Error refreshing licenses:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="space-y-6"
+      className="container mx-auto px-4 py-8"
     >
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Licenses</h1>
+        <button 
+          onClick={handleRefresh}
+          className="flex items-center px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+        >
+          <FiRefreshCw className="mr-2" />
+          Refresh
+        </button>
       </div>
       
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('incoming')}
-            className={`${
-              activeTab === 'incoming'
-                ? 'border-cosota text-cosota dark:text-cosota-light dark:border-cosota-light'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-          >
-            <FiArrowLeft className="mr-2 h-4 w-4" />
-            Incoming Requests
-          </button>
-          <button
-            onClick={() => setActiveTab('outgoing')}
-            className={`${
-              activeTab === 'outgoing'
-                ? 'border-cosota text-cosota dark:text-cosota-light dark:border-cosota-light'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-          >
-            <FiArrowRight className="mr-2 h-4 w-4" />
-            My License Requests
-          </button>
-        </nav>
+      <div className="flex border-b border-gray-200 mb-6">
+        <button
+          className={`py-2 px-4 font-medium ${
+            activeTab === 'incoming'
+              ? 'text-blue-600 border-b-2 border-blue-500'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveTab('incoming')}
+        >
+          <FiArrowLeft className="inline mr-2" />
+          Incoming Requests {incomingLicenses.length > 0 && `(${incomingLicenses.length})`}
+        </button>
+        <button
+          className={`py-2 px-4 font-medium ${
+            activeTab === 'outgoing'
+              ? 'text-blue-600 border-b-2 border-blue-500'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveTab('outgoing')}
+        >
+          <FiArrowRight className="inline mr-2" />
+          Outgoing Requests {outgoingLicenses.length > 0 && `(${outgoingLicenses.length})`}
+        </button>
       </div>
-
+      
       <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           {/* Search and Filter Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 mb-4">
             <div className="relative rounded-md shadow-sm w-full sm:w-64">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                <FiSearch className="text-gray-400" />
               </div>
               <input
                 type="text"
+                placeholder="Search by track or user..."
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="focus:ring-cosota focus:border-cosota block w-full pl-10 sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="Search licenses..."
               />
             </div>
             
             <button
               type="button"
-              onClick={toggleFilter}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
             >
-              <FiFilter className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
+              <FiFilter className="mr-2" />
               Filter
-              {isFilterOpen ? (
-                <FiChevronUp className="ml-2 h-4 w-4" />
-              ) : (
-                <FiChevronDown className="ml-2 h-4 w-4" />
-              )}
+              {isFilterOpen ? <FiChevronUp className="ml-1" /> : <FiChevronDown className="ml-1" />}
             </button>
           </div>
-
-          {/* Expanded Filter Options */}
+          
+          {/* Filter Panel */}
           {isFilterOpen && (
             <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md mb-4 animate-fadeIn">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -409,14 +361,16 @@ const MyLicenses: React.FC = () => {
                   </label>
                   <select
                     id="statusFilter"
+                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white"
                   >
-                    <option value="all">All</option>
+                    <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
+                    <option value="paid">Paid</option>
+                    <option value="published">Published</option>
                   </select>
                 </div>
                 
@@ -424,63 +378,39 @@ const MyLicenses: React.FC = () => {
                   <label htmlFor="sortBy" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Sort By
                   </label>
-                  <div className="flex space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('track')}
-                      className={`inline-flex items-center px-3 py-2 border ${
-                        sortBy === 'track' ? 'border-cosota text-cosota bg-cosota-light/10 dark:bg-cosota-dark/10' : 'border-gray-300 text-gray-700 dark:text-white dark:border-gray-600 dark:bg-gray-700'
-                      } text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota`}
-                    >
-                      Track
-                      {sortBy === 'track' && (
-                        sortDirection === 'asc' ? (
-                          <FiChevronUp className="ml-1 h-4 w-4" />
-                        ) : (
-                          <FiChevronDown className="ml-1 h-4 w-4" />
-                        )
-                      )}
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('date')}
-                      className={`inline-flex items-center px-3 py-2 border ${
-                        sortBy === 'date' ? 'border-cosota text-cosota bg-cosota-light/10 dark:bg-cosota-dark/10' : 'border-gray-300 text-gray-700 dark:text-white dark:border-gray-600 dark:bg-gray-700'
-                      } text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota`}
-                    >
-                      Date
-                      {sortBy === 'date' && (
-                        sortDirection === 'asc' ? (
-                          <FiChevronUp className="ml-1 h-4 w-4" />
-                        ) : (
-                          <FiChevronDown className="ml-1 h-4 w-4" />
-                        )
-                      )}
-                    </button>
-                  </div>
+                  <select
+                    id="sortBy"
+                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'date' | 'track')}
+                  >
+                    <option value="date">Date</option>
+                    <option value="track">Track Title</option>
+                  </select>
                 </div>
-              </div>
-              
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="text-sm text-cosota hover:text-cosota-dark dark:text-cosota-light"
-                >
-                  Reset filters
-                </button>
+                
+                <div>
+                  <label htmlFor="sortDirection" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Sort Direction
+                  </label>
+                  <select
+                    id="sortDirection"
+                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    value={sortDirection}
+                    onChange={(e) => setSortDirection(e.target.value as 'asc' | 'desc')}
+                  >
+                    <option value="desc">Newest First</option>
+                    <option value="asc">Oldest First</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
-
-          {/* Licenses List */}
+          
+          {/* License List */}
           {isLoading ? (
             <div className="flex justify-center items-center py-10">
-              <svg className="animate-spin h-8 w-8 text-cosota" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
           ) : activeTab === 'incoming' ? (
             filteredIncomingLicenses.length === 0 ? (
@@ -488,30 +418,31 @@ const MyLicenses: React.FC = () => {
                 <FiFileText className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No incoming license requests</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {incomingLicenses.length > 0 
-                    ? 'No licenses match your current filters.'
-                    : 'You don\'t have any incoming license requests yet.'}
+                  When someone requests a license for your tracks, they will appear here.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Track
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Licensee
+                        Requester
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Requested
+                        Purpose
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Date
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Status
                       </th>
-                      <th scope="col" className="relative px-6 py-3">
-                        <span className="sr-only">View</span>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -520,35 +451,66 @@ const MyLicenses: React.FC = () => {
                       <tr key={license.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-cosota-light/10 dark:bg-cosota-dark/10">
-                              <FiMusic className="h-5 w-5 text-cosota" />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{license.trackTitle}</div>
-                              <Link to={`/artist/my-tracks/${license.trackId}`} className="text-xs text-cosota hover:text-cosota-dark dark:text-cosota-light">
-                                View Track
-                              </Link>
+                            <FiMusic className="mr-2 text-gray-500" />
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {license.track?.title || 'Unknown Track'}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">{license.licensee}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{license.licenseeEmail}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {license.requester?.firstName} {license.requester?.lastName}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {license.requester?.email}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(license.requestedAt)}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {license.purpose}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {license.usageType} - {license.territory}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {formatDate(license.createdAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(license.status)}
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(license.status)}`}>
+                            {getStatusIcon(license.status)} {license.status}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            type="button"
-                            onClick={() => handleViewDetails(license)}
-                            className="text-cosota hover:text-cosota-dark dark:text-cosota-light"
+                            onClick={() => handleOpenModal(license)}
+                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
                           >
                             View Details
                           </button>
+                          {license.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedLicense(license);
+                                  handleApproveLicense(license);
+                                }}
+                                className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedLicense(license);
+                                  setIsRejecting(true);
+                                  setIsModalOpen(true);
+                                }}
+                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -562,33 +524,31 @@ const MyLicenses: React.FC = () => {
                 <FiFileText className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No outgoing license requests</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {outgoingLicenses.length > 0 
-                    ? 'No licenses match your current filters.'
-                    : 'You haven\'t requested any licenses yet.'}
+                  When you request a license for a track, it will appear here.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Track
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Artist
+                        Owner
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Requested
+                        Purpose
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Date
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Status
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Fee
-                      </th>
-                      <th scope="col" className="relative px-6 py-3">
-                        <span className="sr-only">View</span>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -597,35 +557,66 @@ const MyLicenses: React.FC = () => {
                       <tr key={license.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-cosota-light/10 dark:bg-cosota-dark/10">
-                              <FiMusic className="h-5 w-5 text-cosota" />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{license.trackTitle}</div>
+                            <FiMusic className="mr-2 text-gray-500" />
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {license.track?.title || 'Unknown Track'}
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">{license.artistName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(license.requestedAt)}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(license.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {license.fee ? `${license.fee.toLocaleString()} TZS` : '-'}
+                            {license.owner?.firstName} {license.owner?.lastName}
                           </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {license.owner?.email}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {license.purpose}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {license.usageType} - {license.territory}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {formatDate(license.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(license.status)}`}>
+                            {getStatusIcon(license.status)} {license.status}
+                          </span>
+                          {license.status === 'rejected' && license.rejectionReason && (
+                            <div className="text-xs text-red-500 mt-1">
+                              Reason: {license.rejectionReason}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => handleViewDetails(license)}
-                            className="text-cosota hover:text-cosota-dark dark:text-cosota-light"
+                            onClick={() => handleOpenModal(license)}
+                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
                           >
                             View Details
                           </button>
+                          {license.status === 'approved' && (
+                            <NavLink 
+                              to="/artist/track-payments"
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                            >
+                              View Payments
+                            </NavLink>
+                          )}
+                          {license.status === 'published' && license.certificateUrl && (
+                            <a
+                              href={license.certificateUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
+                            >
+                              <FiDownload className="inline mr-1" /> Certificate
+                            </a>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -646,123 +637,255 @@ const MyLicenses: React.FC = () => {
             </div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
+            
             <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                     <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                      License Request Details
+                      License Details
                     </h3>
-                    
+                    {paymentError && (
+                      <div className="mt-2 p-2 bg-red-100 text-red-800 rounded-md">
+                        {paymentError}
+                      </div>
+                    )}
+                    {paymentSuccess && (
+                      <div className="mt-2 p-2 bg-green-100 text-green-800 rounded-md">
+                        {paymentSuccess}
+                      </div>
+                    )}
                     <div className="mt-4 space-y-4">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Track</h4>
-                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLicense.trackTitle}</p>
+                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Track Information</h4>
+                        <p className="text-base text-gray-900 dark:text-white">
+                          {selectedLicense.track?.title || 'Unknown Track'}
+                        </p>
                       </div>
                       
-                      {/* Show different fields based on license type */}
-                      {'licensee' in selectedLicense ? (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Licensee</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLicense.licensee}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{selectedLicense.licenseeEmail}</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Artist</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLicense.artistName}</p>
+                      {/* Payment Information for approved licenses */}
+                      {selectedLicense.status === 'approved' && payments[selectedLicense.id] && (
+                        <div className="mt-4 border-t pt-4">
+                          <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Payment Information</h4>
+                          
+                          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</h5>
+                                <p className="text-base text-gray-900 dark:text-white">
+                                  {payments[selectedLicense.id].amount.toLocaleString()} TZS
+                                </p>
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h5>
+                                <p className="text-base text-gray-900 dark:text-white capitalize">
+                                  {payments[selectedLicense.id].status}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {payments[selectedLicense.id].status === 'initial' && (
+                              <div className="mt-4">
+                                <button
+                                  onClick={() => handleGenerateInvoice(selectedLicense)}
+                                  disabled={isPaymentProcessing}
+                                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isPaymentProcessing ? 'Processing...' : 'Generate Invoice'}
+                                </button>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Generate an invoice to proceed with payment
+                                </p>
+                              </div>
+                            )}
+                            
+                            {payments[selectedLicense.id].status === 'pending' && (
+                              <div className="mt-4">
+                                <div className="mb-2">
+                                  <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400">Control Number</h5>
+                                  <p className="text-base text-gray-900 dark:text-white font-mono">
+                                    {payments[selectedLicense.id].controlNumber}
+                                  </p>
+                                </div>
+                                <div className="mb-2">
+                                  <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400">Expires</h5>
+                                  <p className="text-base text-gray-900 dark:text-white">
+                                    {new Date(payments[selectedLicense.id].expiry).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="p-3 bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 rounded-md mt-2 text-sm">
+                                  <p className="font-medium">Payment Instructions:</p>
+                                  <ol className="list-decimal list-inside mt-1">
+                                    <li>Use the control number above to make payment via mobile money or bank</li>
+                                    <li>Once payment is confirmed, your license will be updated automatically</li>
+                                    <li>Payment must be made before the expiry date</li>
+                                  </ol>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Requester</h4>
+                          <p className="text-base text-gray-900 dark:text-white">
+                            {selectedLicense.requester?.firstName} {selectedLicense.requester?.lastName}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Owner</h4>
+                          <p className="text-base text-gray-900 dark:text-white">
+                            {selectedLicense.owner?.firstName} {selectedLicense.owner?.lastName}
+                          </p>
+                        </div>
+                      </div>
                       
                       <div>
                         <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Purpose</h4>
-                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedLicense.purpose}</p>
+                        <p className="text-base text-gray-900 dark:text-white">{selectedLicense.purpose}</p>
                       </div>
                       
-                      {selectedLicense.fee && (
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">License Fee</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                            {selectedLicense.fee.toLocaleString()} TZS
-                          </p>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Usage Type</h4>
+                          <p className="text-base text-gray-900 dark:text-white">{selectedLicense.usageType}</p>
                         </div>
-                      )}
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Territory</h4>
+                          <p className="text-base text-gray-900 dark:text-white">{selectedLicense.territory}</p>
+                        </div>
+                      </div>
                       
                       <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Request Date</h4>
-                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(selectedLicense.requestedAt)}</p>
+                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Duration</h4>
+                        <p className="text-base text-gray-900 dark:text-white">{selectedLicense.duration} months</p>
                       </div>
-                      
-                      {selectedLicense.responseDate && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Response Date</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(selectedLicense.responseDate)}</p>
-                        </div>
-                      )}
                       
                       <div>
                         <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h4>
-                        <div className="mt-1">{getStatusBadge(selectedLicense.status)}</div>
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedLicense.status)}`}>
+                          {getStatusIcon(selectedLicense.status)} {selectedLicense.status}
+                        </span>
+                        {selectedLicense.status === 'rejected' && selectedLicense.rejectionReason && (
+                          <p className="text-sm text-red-500 mt-1">{selectedLicense.rejectionReason}</p>
+                        )}
                       </div>
+                      
+                      {selectedLicense.status === 'published' && selectedLicense.certificateUrl && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Certificate</h4>
+                          <a 
+                            href={selectedLicense.certificateUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 flex items-center mt-1"
+                          >
+                            <FiExternalLink className="mr-1" /> View Certificate
+                          </a>
+                        </div>
+                      )}
+                      
+                      {selectedLicense.status === 'published' && selectedLicense.blockchainTx && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Blockchain Transaction</h4>
+                          <a 
+                            href={`https://explorer.blockchain.com/tx/${selectedLicense.blockchainTx}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 flex items-center mt-1"
+                          >
+                            <FiExternalLink className="mr-1" /> View Transaction
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                {/* Only show approve/reject buttons for incoming licenses with pending status */}
-                {'licensee' in selectedLicense && selectedLicense.status === 'pending' ? (
+                {isRejecting ? (
                   <>
                     <button
                       type="button"
-                      onClick={handleApprove}
-                      disabled={isProcessing}
-                      className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm ${
-                        isProcessing ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
+                      onClick={() => handleRejectLicense(selectedLicense)}
+                      disabled={isProcessing || !rejectionReason.trim()}
+                      className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm ${isProcessing || !rejectionReason.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      {isProcessing ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <FiCheck className="-ml-1 mr-2 h-4 w-4" />
-                          Approve
-                        </>
-                      )}
+                      {isProcessing ? 'Processing...' : 'Confirm Rejection'}
                     </button>
                     <button
                       type="button"
-                      onClick={handleReject}
-                      disabled={isProcessing}
-                      className={`mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm ${
-                        isProcessing ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
+                      onClick={() => {
+                        setIsRejecting(false);
+                        setRejectionReason('');
+                      }}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                     >
-                      {isProcessing ? (
-                        'Processing...'
-                      ) : (
-                        <>
-                          <FiX className="-ml-1 mr-2 h-4 w-4" />
-                          Reject
-                        </>
-                      )}
+                      Cancel
+                    </button>
+                  </>
+                ) : activeTab === 'incoming' && selectedLicense.status === 'pending' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveLicense(selectedLicense)}
+                      disabled={isProcessing}
+                      className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {isProcessing ? 'Processing...' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsRejecting(true)}
+                      disabled={isProcessing}
+                      className={`mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      Reject
                     </button>
                   </>
                 ) : null}
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota sm:mt-0 sm:w-auto sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm"
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Rejection Reason Modal */}
+      {isRejecting && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <FiX className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Provide Rejection Reason</h3>
+                    <div className="mt-2">
+                      <textarea
+                        rows={4}
+                        className="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        placeholder="Please provide a reason for rejecting this license request..."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

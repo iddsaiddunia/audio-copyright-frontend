@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../../contexts/AuthContext';
+import type { AuthContextType } from '../../contexts/AuthContext';
 import { NavLink } from 'react-router-dom';
 import { FiDollarSign, FiArrowLeft, FiCheckCircle, FiShare2 } from 'react-icons/fi';
 import { ApiService } from '../../services/apiService';
@@ -23,10 +25,18 @@ interface Payment {
   createdAt?: string;
   updatedAt?: string;
   track?: { title: string };
+  license?: {
+    id: string;
+    status: 'pending' | 'approved' | 'rejected' | 'paid' | 'published';
+    usageType: string;
+    requesterId: string;
+  };
+  licenseId?: string;
 }
 
 export default function TrackPayments() {
   const [selectedType, setSelectedType] = useState<'registration' | 'licensing' | 'transfer'>('registration');
+  const { currentUser } = useContext(AuthContext) as AuthContextType; // Explicit typing
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [payments, setPayments] = useState<Payment[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
@@ -63,12 +73,20 @@ export default function TrackPayments() {
   }, []);
 
   useEffect(() => {
-    let filtered = payments.filter(p => p.paymentType === selectedType);
+    let filtered = payments.filter(p => {
+      if (p.paymentType !== selectedType) return false;
+      if (p.paymentType === 'licensing') {
+        // Only show licensing payments to the requester in the licensing tab
+        return p.license && currentUser && p.license.requesterId === currentUser.id;
+      }
+      // For other payment types, show as before
+      return true;
+    });
     if (searchQuery) {
       filtered = filtered.filter(p => (p.track?.title || '').toLowerCase().includes(searchQuery.toLowerCase()));
     }
     setFilteredPayments(filtered);
-  }, [payments, selectedType, searchQuery]);
+  }, [payments, selectedType, searchQuery, currentUser]);
 
   function handleSearch(e: React.ChangeEvent<HTMLInputElement>) {
     setSearchQuery(e.target.value);
@@ -129,7 +147,7 @@ export default function TrackPayments() {
               <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th scope="col" className="py-3 px-6">Track Name</th>
+                    <th scope="col" className="py-3 px-6">Track Information</th>
                     <th scope="col" className="py-3 px-6">Payment Status</th>
                     <th scope="col" className="py-3 px-6">Action</th>
                   </tr>
@@ -139,30 +157,62 @@ export default function TrackPayments() {
                     <tr><td colSpan={3} className="text-center py-8">No payments found.</td></tr>
                   ) : filteredPayments.map((payment) => (
                     <tr key={payment.id} className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                      <td className="py-4 px-6">{payment.track?.title || payment.trackId}</td>
+                      <td className="py-4 px-6">
+                        {payment.track?.title || payment.trackId}
+                        {payment.paymentType === 'licensing' && payment.license && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            License: {payment.license.usageType}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-4 px-6">
                         {payment.status === 'initial' && <span className="badge-warning">Initial</span>}
                         {payment.status === 'pending' && <span className="badge-info">Pending</span>}
                         {payment.status === 'approved' && <span className="badge-success">Approved</span>}
                         {payment.status === 'rejected' && <span className="badge-error">Rejected</span>}
+                        {payment.paymentType === 'licensing' && payment.license && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            License Status: <span className="font-medium">{payment.license.status}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-4 px-6">
-                        {payment.status === 'initial' ? (
-                          <button
-                            className="py-2 px-4 rounded-md text-sm font-medium bg-cosota text-white border-cosota hover:bg-cosota-dark focus:outline-none"
-                            disabled={loadingPaymentId === payment.id}
-                            onClick={() => handleGenerateInvoice(payment)}
-                          >
-                            {loadingPaymentId === payment.id ? 'Generating...' : 'Generate Invoice'}
-                          </button>
-                        ) : (
-                          <button
-                            className="py-2 px-4 rounded-md text-sm font-medium bg-blue-600 text-white border-blue-600 hover:bg-blue-700 focus:outline-none"
-                            onClick={() => handleViewInvoice(payment)}
-                          >
-                            View Invoice
-                          </button>
-                        )}
+                        {/* Only show Generate Invoice for licensing payments to the requester */}
+                        {payment.paymentType === 'licensing' && payment.license && currentUser && payment.license.requesterId === currentUser.id ? (
+                          payment.status === 'initial' ? (
+                            <button
+                              className="py-2 px-4 rounded-md text-sm font-medium bg-cosota text-white border-cosota hover:bg-cosota-dark focus:outline-none"
+                              disabled={loadingPaymentId === payment.id}
+                              onClick={() => handleGenerateInvoice(payment)}
+                            >
+                              {loadingPaymentId === payment.id ? 'Generating...' : 'Generate Invoice'}
+                            </button>
+                          ) : (
+                            <button
+                              className="py-2 px-4 rounded-md text-sm font-medium bg-blue-600 text-white border-blue-600 hover:bg-blue-700 focus:outline-none"
+                              onClick={() => handleViewInvoice(payment)}
+                            >
+                              View Invoice
+                            </button>
+                          )
+                        ) : payment.paymentType !== 'licensing' ? (
+                          payment.status === 'initial' ? (
+                            <button
+                              className="py-2 px-4 rounded-md text-sm font-medium bg-cosota text-white border-cosota hover:bg-cosota-dark focus:outline-none"
+                              disabled={loadingPaymentId === payment.id}
+                              onClick={() => handleGenerateInvoice(payment)}
+                            >
+                              {loadingPaymentId === payment.id ? 'Generating...' : 'Generate Invoice'}
+                            </button>
+                          ) : (
+                            <button
+                              className="py-2 px-4 rounded-md text-sm font-medium bg-blue-600 text-white border-blue-600 hover:bg-blue-700 focus:outline-none"
+                              onClick={() => handleViewInvoice(payment)}
+                            >
+                              View Invoice
+                            </button>
+                          )
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -199,6 +249,12 @@ export default function TrackPayments() {
                   <span className="font-semibold text-gray-700 dark:text-gray-200">Payment Type:</span>
                   <span className="text-gray-900 dark:text-white">{invoiceModal.paymentType.charAt(0).toUpperCase() + invoiceModal.paymentType.slice(1)}</span>
                 </div>
+                {invoiceModal.paymentType === 'licensing' && invoiceModal.license && (
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="font-semibold text-gray-700 dark:text-gray-200">License:</span>
+                    <span className="text-gray-900 dark:text-white">{invoiceModal.license.usageType}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-gray-700 dark:text-gray-200">Amount:</span>
                   <span className="font-mono text-lg text-green-700 dark:text-green-400">{invoiceModal.amount.toLocaleString()} TZS</span>

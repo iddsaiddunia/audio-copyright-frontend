@@ -85,7 +85,7 @@ export class ApiService {
 
   getAllTracks() {
     return this.request<any[]>({ url: '/tracks/all', method: 'GET' });
-  
+
   }
 
   getTrackById(id: string) {
@@ -98,6 +98,62 @@ export class ApiService {
 
   rejectTrack(id: string) {
     return this.request<any>({ url: `/tracks/${id}/reject`, method: 'POST' });
+  }
+
+  // License endpoints
+  getUserLicenses(role?: 'owner' | 'requester') {
+    const url = role ? `/licenses/user?role=${role}` : '/licenses/user';
+    return this.request<any[]>({ url, method: 'GET' });
+  }
+
+  getAllLicenses() {
+    return this.request<any[]>({ url: '/licenses/all', method: 'GET' });
+  }
+
+  getAvailableTracksForLicensing() {
+    return this.request<any[]>({ url: '/licenses/available-tracks', method: 'GET' });
+  }
+
+  getLicenseById(id: string) {
+    return this.request<any>({ url: `/licenses/${id}`, method: 'GET' });
+  }
+
+  createLicenseRequest(data: {
+    trackId: string;
+    purpose: string;
+    duration: number;
+    territory: string;
+    usageType: string;
+  }) {
+    return this.request<any>({ url: '/licenses', method: 'POST', data });
+  }
+
+  approveLicenseRequest(id: string) {
+    return this.request<any>({ url: `/licenses/${id}/approve`, method: 'POST' });
+  }
+
+  rejectLicenseRequest(id: string, rejectionReason: string) {
+    return this.request<any>({
+      url: `/licenses/${id}/reject`,
+      method: 'POST',
+      data: { rejectionReason }
+    });
+  }
+
+  markLicenseAsPaid(id: string, paymentId: string) {
+    return this.request<any>({
+      url: `/licenses/${id}/mark-paid`,
+      method: 'POST',
+      data: { paymentId }
+    });
+  }
+
+  publishLicenseToBlockchain(id: string, blockchainTx: string, certificateUrl: string) {
+    return this.request<any>({
+      url: `/licenses/${id}/publish`,
+      method: 'POST',
+      data: { blockchainTx, certificateUrl }
+    });
   }
 
   checkTrackCopyright(id: string) {
