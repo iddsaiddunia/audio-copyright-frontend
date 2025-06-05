@@ -51,6 +51,24 @@ const AdminLayout = () => {
       permission: 'approveTracks' // Content Admin
     },
     { 
+      path: '/admin/license-requests', 
+      label: 'License Requests', 
+      icon: <FiFileText className="w-5 h-5" />, 
+      permission: 'approveLicenses' // Content Admin 
+    },
+    { 
+      path: '/admin/license-publish', 
+      label: 'License Publish', 
+      icon: <FiFileText className="w-5 h-5" />, 
+      permission: 'publishCopyrights' // Technical & Super Admins only
+    },
+    { 
+      path: '/admin/transfer-publish', 
+      label: 'Transfer Publish', 
+      icon: <FiDatabase className="w-5 h-5" />, 
+      permission: 'publishCopyrights' // Technical & Super Admins only
+    },
+    { 
       path: '/admin/payment-verification', 
       label: 'Payment Verification', 
       icon: <FiFileText className="w-5 h-5" />,
@@ -71,8 +89,8 @@ const AdminLayout = () => {
     { 
       path: '/admin/user-management', 
       label: 'User Management', 
-      icon: <FiUsers className="w-5 h-5" />,
-      permission: 'manageUsers' // Technical Admin only
+      icon: <FiUsers className="w-5 h-5" />, 
+      permission: ['manageUsers', 'allPermissions'] // Technical & Super Admins
     },
     { 
       path: '/admin/settings', 
@@ -94,10 +112,14 @@ const AdminLayout = () => {
   }
   console.log('AdminLayout nav debug:', { currentUser, userPerms });
 
-  // Filter nav items based on user permissions
-  const navItems = allNavItems.filter(item => 
-    item.permission === null || hasPermission(item.permission)
-  );
+  // Enhanced permission check: allow permission to be string or array
+  const navItems = allNavItems.filter(item => {
+    if (item.permission === null) return true;
+    if (Array.isArray(item.permission)) {
+      return item.permission.some((perm) => hasPermission(perm));
+    }
+    return hasPermission(item.permission);
+  });
 
   const handleLogout = async () => {
     await logout();

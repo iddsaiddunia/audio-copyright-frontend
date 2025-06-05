@@ -12,97 +12,19 @@ import {
   FiX
 } from 'react-icons/fi';
 import UserForm from '../../components/UserForm';
+import { ApiService } from '../../services/apiService';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Define admin roles based on our auth context
-type AdminRole = 'contentAdmin' | 'financialAdmin' | 'technicalAdmin';
+type AdminRole = 'content' | 'financial' | 'technical' | 'super';
 type UserRole = AdminRole;
-
-// Mock data for users
-const mockUsers = [
-  {
-    id: '1',
-    username: 'john_admin',
-    email: 'john@cosota.com',
-    fullName: 'John Makonde',
-    phone: '+255 712 345 678',
-    role: 'contentAdmin',
-    status: 'active',
-    lastLogin: '2025-05-20T10:30:00Z',
-    createdAt: '2024-11-15T08:00:00Z'
-  },
-  {
-    id: '2',
-    username: 'maria_finance',
-    email: 'maria@cosota.com',
-    fullName: 'Maria Kimaro',
-    phone: '+255 755 987 654',
-    role: 'financialAdmin',
-    status: 'active',
-    lastLogin: '2025-05-23T14:20:00Z',
-    createdAt: '2024-11-16T09:15:00Z'
-  },
-  {
-    id: '3',
-    username: 'david_tech',
-    email: 'david@cosota.com',
-    fullName: 'David Mwangi',
-    phone: '+255 786 123 456',
-    role: 'technicalAdmin',
-    status: 'active',
-    lastLogin: '2025-05-24T08:45:00Z',
-    createdAt: '2024-10-05T11:30:00Z'
-  },
-  {
-    id: '4',
-    username: 'sarah_verify',
-    email: 'sarah@cosota.com',
-    fullName: 'Sarah Ochieng',
-    phone: '+255 733 456 789',
-    role: 'contentAdmin',
-    status: 'inactive',
-    lastLogin: '2025-05-10T16:20:00Z',
-    createdAt: '2024-12-20T10:00:00Z'
-  },
-  {
-    id: '5',
-    username: 'james_blockchain',
-    email: 'james@cosota.com',
-    fullName: 'James Mushi',
-    phone: '+255 765 234 567',
-    role: 'technicalAdmin',
-    status: 'active',
-    lastLogin: '2025-05-22T09:10:00Z',
-    createdAt: '2025-01-10T08:30:00Z'
-  },
-  {
-    id: '6',
-    username: 'amina_license',
-    email: 'amina@cosota.com',
-    fullName: 'Amina Hassan',
-    phone: '+255 778 901 234',
-    role: 'contentAdmin',
-    status: 'active',
-    lastLogin: '2025-05-21T11:45:00Z',
-    createdAt: '2025-02-05T13:20:00Z'
-  },
-  {
-    id: '7',
-    username: 'peter_system',
-    email: 'peter@cosota.com',
-    fullName: 'Peter Ndungu',
-    phone: '+255 722 345 678',
-    role: 'technicalAdmin',
-    status: 'active',
-    lastLogin: '2025-05-23T15:30:00Z',
-    createdAt: '2024-09-15T09:45:00Z'
-  }
-];
 
 // Role mapping for display
 const roleMapping = {
-  contentAdmin: 'Content Approval Admin',
-  financialAdmin: 'Financial Admin',
-  technicalAdmin: 'Technical Administrator'
+  content: 'Content Admin',
+  financial: 'Financial Admin',
+  technical: 'Technical Admin',
+  super: 'Super Admin'
 };
 
 interface User {
@@ -112,6 +34,7 @@ interface User {
   fullName: string;
   phone?: string;
   role: string;
+  adminType?: string;
   roles?: UserRole[];
   status: 'active' | 'inactive' | 'suspended';
   lastLogin: string;
@@ -125,31 +48,75 @@ const UserManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [adminTypeFilter, setAdminTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { currentUser: loggedInUser } = useAuth(); // Used for role-based UI restrictions
+  const apiService = new ApiService({ getToken: () => localStorage.getItem('token') || '' });
 
-  // Fetch users data (mock implementation)
+  // Fetch users from real API
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const apiUsers = await apiService.listUsers();
+      setUsers(apiUsers);
+      setFilteredUsers(apiUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        // Cast mockUsers to ensure TypeScript understands the status property is of the correct type
-        const typedUsers = mockUsers as User[];
-        setUsers(typedUsers);
-        setFilteredUsers(typedUsers);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchUsers();
   }, []);
+
+  // Add user
+  const handleAddUserSubmit = async (userData: any) => {
+    setIsLoading(true);
+    try {
+      // Split name into firstName and lastName
+      const [firstName, ...rest] = (userData.name || '').split(' ');
+      const lastName = rest.join(' ') || '';
+      // Use roles[0] as adminType
+      const adminType = userData.roles && userData.roles.length > 0 ? userData.roles[0] : undefined;
+      // TODO: Ensure idNumber is collected in the form
+      const payload = {
+        firstName,
+        lastName,
+        email: userData.email,
+        password: userData.password,
+        phoneNumber: userData.phone,
+        idNumber: userData.idNumber, // TODO: Add idNumber to UserForm if missing
+        adminType,
+      };
+      await apiService.createAdminUser(payload);
+      await fetchUsers(); // Refresh user list from backend
+      setShowAddUserModal(false);
+    } catch (error) {
+      console.error('Error adding user:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Edit user
+  const handleEditUserSubmit = async (userData: Partial<User>) => {
+    if (!currentUser) return;
+    setIsLoading(true);
+    try {
+      const updatedUser = await apiService.updateUser(currentUser.id, userData);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+      setShowEditUserModal(false);
+    } catch (error) {
+      console.error('Error updating user:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Filter users based on search term and filters
   useEffect(() => {
@@ -169,14 +136,19 @@ const UserManagement: React.FC = () => {
     if (roleFilter !== 'all') {
       result = result.filter(user => user.role === roleFilter);
     }
-    
+
+    // If admin, apply adminType filter
+    if (roleFilter === 'admin' && adminTypeFilter !== 'all') {
+      result = result.filter(user => user.adminType === adminTypeFilter);
+    }
+
     // Apply status filter
     if (statusFilter !== 'all') {
       result = result.filter(user => user.status === statusFilter);
     }
     
     setFilteredUsers(result);
-  }, [users, searchTerm, roleFilter, statusFilter]);
+  }, [users, searchTerm, roleFilter, adminTypeFilter, statusFilter]);
 
   const handleAddUser = () => {
     setCurrentUser(null);
@@ -190,10 +162,9 @@ const UserManagement: React.FC = () => {
 
   const handleDeleteUser = async (userId: string) => {
     if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      // Simulate API call
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await apiService.deleteUser(userId);
         setUsers(users.filter(user => user.id !== userId));
       } catch (error) {
         console.error('Error deleting user:', error);
@@ -204,13 +175,10 @@ const UserManagement: React.FC = () => {
   };
 
   const handleToggleUserStatus = async (userId: string, currentStatus: 'active' | 'inactive' | 'suspended') => {
-    // Simulate API call
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Type-safe status toggle
-      const newStatus = currentStatus === 'active' ? 'inactive' as const : 'active' as const;
-      
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      await apiService.updateUserStatus(userId, { status: newStatus });
       setUsers(users.map(user => 
         user.id === userId 
           ? { ...user, status: newStatus } 
@@ -245,22 +213,14 @@ const UserManagement: React.FC = () => {
 
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
-      case 'contentAdmin':
+      case 'content':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
-      case 'verificationAdmin':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
-      case 'blockchainAdmin':
-        return 'bg-blockchain-light/20 text-blockchain-light dark:bg-blockchain-dark/20 dark:text-blockchain-dark';
-      case 'publishingAdmin':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
-      case 'financialAdmin':
+      case 'financial':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
-      case 'licenseAdmin':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
-      case 'systemAdmin':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
-      case 'technicalAdmin':
+      case 'technical':
         return 'bg-cosota-light/20 text-cosota-light dark:bg-cosota-dark/20 dark:text-cosota';
+      case 'super':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
@@ -299,40 +259,62 @@ const UserManagement: React.FC = () => {
 
       {/* Filters and Search */}
       <div className="bg-white dark:bg-gray-800 shadow px-4 py-5 sm:rounded-lg sm:p-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          <div className="col-span-1 sm:col-span-2">
-            <label htmlFor="search" className="sr-only">Search</label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="h-5 w-5 text-gray-400" aria-hidden="true" />
-              </div>
-              <input
-                type="text"
-                name="search"
-                id="search"
-                className="focus:ring-cosota focus:border-cosota block w-full pl-10 sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="Search by name, email, or username"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        {/* Search Bar Row */}
+        <div className="mb-4 w-full">
+          <label htmlFor="search" className="sr-only">Search</label>
+          <div className="relative rounded-md shadow-sm">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FiSearch className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </div>
+            <input
+              type="text"
+              name="search"
+              id="search"
+              className="focus:ring-cosota focus:border-cosota block w-full pl-10 sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              placeholder="Search by name, email, or username"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-
-          <div>
+        </div>
+        {/* Filters Row */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end">
+          <div className="flex-1 min-w-[160px]">
             <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
             <select
               id="role-filter"
               name="role-filter"
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setAdminTypeFilter('all'); // reset admin type filter when role changes
+              }}
             >
               <option value="all">All Roles</option>
-              <option value="contentAdmin">Content Admin</option>
-              <option value="financialAdmin">Financial Admin</option>
-              <option value="technicalAdmin">Technical Admin</option>
+              <option value="admin">Admin</option>
+              <option value="artist">Artist</option>
+              <option value="licensee">Licensee</option>
             </select>
           </div>
+          {roleFilter === 'admin' && (
+            <div className="flex-1 min-w-[180px]">
+              <label htmlFor="admin-type-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Admin Type</label>
+              <select
+                id="admin-type-filter"
+                name="admin-type-filter"
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                value={adminTypeFilter}
+                onChange={(e) => setAdminTypeFilter(e.target.value)}
+              >
+                <option value="all">All Admin Types</option>
+                <option value="content">Content</option>
+                <option value="financial">Financial</option>
+                <option value="technical">Technical</option>
+                <option value="super">Super</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
@@ -502,25 +484,11 @@ const UserManagement: React.FC = () => {
                 </div>
               </div>
               <div className="mt-5">
-                <UserForm 
-                  onSubmit={(userData) => {
-                    // Handle form submission
-                    const newUser: User = {
-                      id: Math.random().toString(36).substr(2, 9),
-                      username: userData.email.split('@')[0],
-                      email: userData.email,
-                      fullName: userData.name,
-                      phone: userData.phone,
-                      role: userData.roles[0] || 'contentAdmin',
-                      roles: userData.roles,
-                      status: 'active' as const,
-                      lastLogin: new Date().toISOString(),
-                      createdAt: new Date().toISOString()
-                    };
-                    
-                    setUsers([...users, newUser]);
-                    setShowAddUserModal(false);
-                  }}
+                <UserForm
+                  onSubmit={handleAddUserSubmit}
+                  isEditMode={false}
+                  initialData={{}}
+                  currentUserRole={loggedInUser?.role as AdminRole}
                 />
               </div>
             </div>
@@ -563,7 +531,7 @@ const UserManagement: React.FC = () => {
                 </div>
               </div>
               <div className="mt-5">
-                <UserForm 
+                <UserForm
                   isEditMode={true}
                   initialData={{
                     name: currentUser.fullName,
@@ -571,22 +539,8 @@ const UserManagement: React.FC = () => {
                     phone: currentUser.phone || '',
                     roles: currentUser.roles || [currentUser.role as AdminRole]
                   }}
-                  onSubmit={(userData) => {
-                    // Handle form submission for edit
-                    const updatedUser = {
-                      ...currentUser,
-                      fullName: userData.name,
-                      email: userData.email,
-                      phone: userData.phone,
-                      role: userData.roles[0] || currentUser.role,
-                      roles: userData.roles
-                    };
-                    
-                    setUsers(users.map(user => 
-                      user.id === currentUser.id ? updatedUser : user
-                    ));
-                    setShowEditUserModal(false);
-                  }}
+                  onSubmit={handleEditUserSubmit}
+                  currentUserRole={loggedInUser?.role as AdminRole}
                 />
               </div>
               <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
@@ -601,9 +555,7 @@ const UserManagement: React.FC = () => {
                   type="button"
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota sm:mt-0 sm:col-start-1 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                   onClick={() => setShowEditUserModal(false)}
-                >
-                  Cancel
-                </button>
+                />
               </div>
             </div>
           </div>

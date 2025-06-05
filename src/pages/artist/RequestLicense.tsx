@@ -49,6 +49,7 @@ const RequestLicense: React.FC = () => {
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [availableTracks, setAvailableTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userLicenses, setUserLicenses] = useState<any[]>([]); // Outgoing licenses for this user
   const [formData, setFormData] = useState({
     purpose: '',
     usageDescription: '',
@@ -65,20 +66,20 @@ const RequestLicense: React.FC = () => {
     getToken: () => localStorage.getItem('token')
   });
 
-  // Fetch available tracks when component mounts
+  // Fetch available tracks and user's outgoing licenses when component mounts
   useEffect(() => {
-    const fetchAvailableTracks = async () => {
+    const fetchAvailableTracksAndLicenses = async () => {
       try {
         setIsLoading(true);
         const tracks = await apiService.getAvailableTracksForLicensing();
-        
         // Filter out tracks owned by the current user
         const filteredTracks = currentUser ? 
           tracks.filter((track: Track) => track.artist?.id !== currentUser.id) : 
           tracks;
-        
         setAvailableTracks(filteredTracks);
-        
+        // Fetch user's outgoing licenses
+        const licenses = await apiService.getUserLicenses('requester');
+        setUserLicenses(licenses);
         // If there's a preselected track, set it
         if (preselectedTrackId) {
           const track = filteredTracks.find((t: Track) => t.id === preselectedTrackId);
@@ -87,14 +88,13 @@ const RequestLicense: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch available tracks:', err);
+        console.error('Failed to fetch available tracks or licenses:', err);
         setError('Failed to load available tracks. Please try again later.');
       } finally {
         setIsLoading(false);
       }
     };
-    
-    fetchAvailableTracks();
+    fetchAvailableTracksAndLicenses();
   }, [preselectedTrackId]);
 
   const handleSearch = () => {
@@ -138,11 +138,18 @@ const RequestLicense: React.FC = () => {
     });
   };
 
+  // Check if the selected track already has a license requested by this user
+  const hasRequestedLicense = selectedTrack && userLicenses.some(lic => lic.trackId === selectedTrack.id && ['pending','approved','paid','published'].includes(lic.status));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedTrack) {
       setError('Please select a track to license');
+      return;
+    }
+    if (hasRequestedLicense) {
+      setError('You have already requested a license for this track.');
       return;
     }
     
@@ -338,6 +345,13 @@ const RequestLicense: React.FC = () => {
             <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md flex items-start">
               <FiAlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
               <span>{error}</span>
+            </div>
+          )}
+
+          {selectedTrack && hasRequestedLicense && (
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 rounded-md flex items-start">
+              <FiAlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+              <span>You have already requested a license for this track. You cannot submit another request until the current one is resolved.</span>
             </div>
           )}
 

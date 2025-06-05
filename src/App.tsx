@@ -39,6 +39,8 @@ import TransferDetails from './pages/artist/TransferDetails';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
+import LicensePublish from './pages/admin/LicensePublish';
+import TransferPublish from './pages/admin/TransferPublish';
 import ArtistVerification from './pages/admin/ArtistVerification';
 import TrackApprovals from './pages/admin/TrackApprovals';
 import LicenseRequests from './pages/admin/LicenseRequests';
@@ -91,6 +93,10 @@ function App() {
               <Route path="track-submitted" element={<TrackSubmitted />} />
               <Route path="my-tracks" element={<MyTracks />} />
               <Route path="my-tracks/:trackId" element={<TrackDetails />} />
+              <Route path="register-track" element={<RegisterTrack />} />
+              <Route path="track-submitted" element={<TrackSubmitted />} />
+              <Route path="my-tracks" element={<MyTracks />} />
+              <Route path="my-tracks/:trackId" element={<TrackDetails />} />
               <Route path="transfer-ownership/:trackId" element={<OwnershipTransfer />} />
               <Route path="transfers" element={<TransfersList />} />
               <Route path="transfers/:transferId" element={<TransferDetails />} />
@@ -99,28 +105,24 @@ function App() {
               <Route path="track-payments" element={<TrackPayments />} />
               <Route path="license-settings" element={<LicenseSettings cosotaCommissionPercentage={15} />} />
               <Route path="profile" element={<MyProfile />} />
-            <Route path="transfers" element={<TransfersList />} />
-            <Route path="transfers/:transferId" element={<TransferDetails />} />
-            <Route path="request-license" element={<RequestLicense />} />
-            <Route path="my-licenses" element={<MyLicenses />} />
-            <Route path="license-settings" element={<LicenseSettings cosotaCommissionPercentage={15} />} />
-            <Route path="profile" element={<MyProfile />} />
             </Route>
           </Route>
 
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute requiredRole="admin" />}>
             <Route element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="artist-verification" element={<ArtistVerification />} />
-            <Route path="track-approvals" element={<TrackApprovals />} />
-            <Route path="license-requests" element={<LicenseRequests />} />
-            <Route path="payment-verification" element={<PaymentVerification />} />
-            <Route path="copyright-publishing" element={<CopyrightPublishing />} />
-            <Route path="blockchain" element={<BlockchainRegistry />} />
-            <Route path="financial-reports" element={<FinancialReports />} />
-            <Route path="user-management" element={<UserManagement />} />
-            <Route path="settings" element={<SystemSettings />} />
+              <Route index element={<AdminDashboard />} />
+              <Route path="artist-verification" element={<ArtistVerification />} />
+              <Route path="track-approvals" element={<TrackApprovals />} />
+              <Route path="license-requests" element={<LicenseRequests />} />
+              <Route path="license-publish" element={<LicensePublish />} />
+              <Route path="transfer-publish" element={<TransferPublish />} />
+              <Route path="payment-verification" element={<PaymentVerification />} />
+              <Route path="copyright-publishing" element={<CopyrightPublishing />} />
+              <Route path="blockchain" element={<BlockchainRegistry />} />
+              <Route path="financial-reports" element={<FinancialReports />} />
+              <Route path="user-management" element={<UserManagement />} />
+              <Route path="settings" element={<SystemSettings />} />
             </Route>
           </Route>
 

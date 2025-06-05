@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { FiUser, FiMail, FiLock, FiShield, FiAlertCircle, FiPhone } from 'react-icons/fi';
 
-// Define the admin roles based on your auth context
-type AdminRole = 'technicalAdmin' | 'contentAdmin' | 'financialAdmin';
-type UserRole = AdminRole;
+// Define the admin roles based on backend
+export type AdminRole = 'content' | 'financial' | 'technical' | 'super';
+export type UserRole = AdminRole;
 
 interface UserFormData {
   name: string;
   email: string;
   phone: string;
+  idNumber: string;
   password: string;
   confirmPassword: string;
   roles: UserRole[];
@@ -18,17 +19,20 @@ interface UserFormProps {
   onSubmit: (userData: UserFormData) => void;
   initialData?: Partial<UserFormData>;
   isEditMode?: boolean;
+  currentUserRole: AdminRole;
 }
 
 const UserForm: React.FC<UserFormProps> = ({ 
   onSubmit, 
   initialData = {}, 
-  isEditMode = false 
+  isEditMode = false,
+  currentUserRole
 }) => {
   const [formData, setFormData] = useState<UserFormData>({
     name: initialData.name || '',
     email: initialData.email || '',
     phone: initialData.phone || '',
+    idNumber: initialData.idNumber || '',
     password: '',
     confirmPassword: '',
     roles: initialData.roles || []
@@ -52,6 +56,10 @@ const UserForm: React.FC<UserFormProps> = ({
     
     if (formData.phone && !/^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/.test(formData.phone)) {
       newErrors.phone = 'Phone number is invalid';
+    }
+    
+    if (!formData.idNumber.trim()) {
+      newErrors.idNumber = 'ID Number is required';
     }
     
     if (!isEditMode) {
@@ -82,16 +90,13 @@ const UserForm: React.FC<UserFormProps> = ({
     });
   };
 
-  const handleRoleToggle = (role: UserRole) => {
-    const updatedRoles = formData.roles.includes(role)
-      ? formData.roles.filter(r => r !== role)
-      : [...formData.roles, role];
-    
-    setFormData({
-      ...formData,
-      roles: updatedRoles
-    });
-  };
+  // Role options for the select dropdown
+  const roleOptions: { value: AdminRole; label: string; disabled?: boolean }[] = [
+    { value: 'content', label: 'Content Admin' },
+    { value: 'financial', label: 'Financial Admin' },
+    { value: 'technical', label: 'Technical Admin' },
+    { value: 'super', label: 'Super Admin', disabled: currentUserRole !== 'super' }
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +189,30 @@ const UserForm: React.FC<UserFormProps> = ({
         )}
       </div>
 
+      <div>
+        <label htmlFor="idNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          ID Number
+        </label>
+        <div className="mt-1 relative rounded-md shadow-sm">
+          <input
+            type="text"
+            id="idNumber"
+            name="idNumber"
+            value={formData.idNumber}
+            onChange={handleInputChange}
+            className={`block w-full pl-10 sm:text-sm rounded-md focus:ring-cosota focus:border-cosota ${
+              errors.idNumber 
+                ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' 
+                : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+            }`}
+            placeholder="Enter ID Number"
+          />
+        </div>
+        {errors.idNumber && (
+          <p className="mt-2 text-sm text-red-600 dark:text-red-500">{errors.idNumber}</p>
+        )}
+      </div>
+
       {!isEditMode && (
         <>
           <div>
@@ -251,57 +280,32 @@ const UserForm: React.FC<UserFormProps> = ({
         </>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          User Roles
+      <div className="mb-4">
+        <label htmlFor="roles" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Roles
         </label>
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <input
-              id="role-technical-admin"
-              name="role-technical-admin"
-              type="checkbox"
-              checked={formData.roles.includes('technicalAdmin')}
-              onChange={() => handleRoleToggle('technicalAdmin')}
-              className="h-4 w-4 text-cosota focus:ring-cosota border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
-            />
-            <label htmlFor="role-technical-admin" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-              Technical Administrator
-            </label>
-          </div>
-          
-          <div className="flex items-center">
-            <input
-              id="role-content-admin"
-              name="role-content-admin"
-              type="checkbox"
-              checked={formData.roles.includes('contentAdmin')}
-              onChange={() => handleRoleToggle('contentAdmin')}
-              className="h-4 w-4 text-cosota focus:ring-cosota border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
-            />
-            <label htmlFor="role-content-admin" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-              Content Administrator
-            </label>
-          </div>
-          
-          <div className="flex items-center">
-            <input
-              id="role-financial-admin"
-              name="role-financial-admin"
-              type="checkbox"
-              checked={formData.roles.includes('financialAdmin')}
-              onChange={() => handleRoleToggle('financialAdmin')}
-              className="h-4 w-4 text-cosota focus:ring-cosota border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
-            />
-            <label htmlFor="role-financial-admin" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-              Financial Administrator
-            </label>
-          </div>
-          
-
-        </div>
+        <select
+          name="roles"
+          id="roles"
+          multiple
+          value={formData.roles}
+          onChange={(e) => {
+            const selected = Array.from(e.target.selectedOptions).map(opt => opt.value as UserRole);
+            setFormData({ ...formData, roles: selected });
+          }}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-cosota focus:ring focus:ring-cosota/50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        >
+          {roleOptions.map(opt => (
+            <option key={opt.value} value={opt.value} disabled={!!opt.disabled}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         {errors.roles && (
-          <p className="mt-2 text-sm text-red-600 dark:text-red-500">{errors.roles}</p>
+          <div className="mt-1 text-sm text-red-600 flex items-center gap-1">
+            <FiAlertCircle />
+            {errors.roles}
+          </div>
         )}
       </div>
 

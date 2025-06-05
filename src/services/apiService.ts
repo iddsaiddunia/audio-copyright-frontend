@@ -208,8 +208,42 @@ export class ApiService {
     return this.request<any>({ url: `/licensing/${trackId}/issue`, method: 'POST', data });
   }
 
-  transferCopyright(trackId: string) {
-    return this.request<any>({ url: `/transfer/${trackId}/transfer`, method: 'POST' });
+  // Ownership Transfer endpoints
+  requestOwnershipTransfer(trackId: string, newOwnerId: string) {
+    return this.request<any>({
+      url: `/transfers/${trackId}/transfer`,
+      method: 'POST',
+      data: { newOwnerId },
+    });
+  }
+
+  getMyOutgoingTransfers() {
+    return this.request<any[]>({
+      url: '/transfers/my-outgoing',
+      method: 'GET',
+    });
+  }
+
+  getMyIncomingTransfers() {
+    return this.request<any[]>({
+      url: '/transfers/my-incoming',
+      method: 'GET',
+    });
+  }
+
+  getPendingTransfersForPublish() {
+    return this.request<any[]>({
+      url: '/transfers/pending-for-publish',
+      method: 'GET',
+    });
+  }
+
+  publishTransferToBlockchain(trackId: string, blockchainTx: string, certificateUrl: string) {
+    return this.request<any>({
+      url: `/transfers/${trackId}/publish`,
+      method: 'POST',
+      data: { blockchainTx, certificateUrl },
+    });
   }
 
   // Artist admin endpoints

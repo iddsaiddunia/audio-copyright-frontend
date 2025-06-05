@@ -31,6 +31,9 @@ const LicenseRequests: React.FC = () => {
   const [blockchainTx, setBlockchainTx] = useState('');
   const [certificateUrl, setCertificateUrl] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
+  // State for rejection modal
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
   
   const apiService = new ApiService({
     getToken: () => localStorage.getItem('token') || ''
@@ -58,6 +61,7 @@ const LicenseRequests: React.FC = () => {
     setIsModalOpen(true);
     setIsRejecting(false);
     setIsPublishing(false);
+    setRejectionReason('');
   };
   
   const handleMarkAsPaid = async (licenseId: string, paymentId: string) => {
