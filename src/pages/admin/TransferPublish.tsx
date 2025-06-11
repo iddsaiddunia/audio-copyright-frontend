@@ -88,7 +88,7 @@ const TransferPublish: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transfer Publish</h1>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="mb-2 flex-1">
           <label htmlFor="search" className="sr-only">Search</label>
           <div className="relative rounded-md shadow-sm">
@@ -143,7 +143,11 @@ const TransferPublish: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">{transfer.track?.title || transfer.trackId}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{transfer.currentOwner?.email || transfer.currentOwnerId}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{transfer.newOwner?.email || transfer.newOwnerId}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{transfer.status}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs rounded ${transfer.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : transfer.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {transfer.status}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
                       className="inline-flex items-center px-3 py-1 bg-cosota text-white rounded hover:bg-cosota-dark text-xs"
