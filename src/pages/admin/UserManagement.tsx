@@ -32,7 +32,9 @@ interface User {
   username: string;
   email: string;
   fullName: string;
-  phone?: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
   role: string;
   adminType?: string;
   roles?: UserRole[];
@@ -78,20 +80,14 @@ const UserManagement: React.FC = () => {
   const handleAddUserSubmit = async (userData: any) => {
     setIsLoading(true);
     try {
-      // Split name into firstName and lastName
-      const [firstName, ...rest] = (userData.name || '').split(' ');
-      const lastName = rest.join(' ') || '';
-      // Use roles[0] as adminType
-      const adminType = userData.roles && userData.roles.length > 0 ? userData.roles[0] : undefined;
-      // TODO: Ensure idNumber is collected in the form
       const payload = {
-        firstName,
-        lastName,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         email: userData.email,
         password: userData.password,
-        phoneNumber: userData.phone,
-        idNumber: userData.idNumber, // TODO: Add idNumber to UserForm if missing
-        adminType,
+        phoneNumber: userData.phoneNumber,
+        idNumber: userData.idNumber,
+        adminType: userData.adminType,
       };
       await apiService.createAdminUser(payload);
       await fetchUsers(); // Refresh user list from backend
@@ -102,6 +98,7 @@ const UserManagement: React.FC = () => {
       setIsLoading(false);
     }
   };
+
 
   // Edit user
   const handleEditUserSubmit = async (userData: Partial<User>) => {
@@ -487,7 +484,12 @@ const UserManagement: React.FC = () => {
                 <UserForm
                   onSubmit={handleAddUserSubmit}
                   isEditMode={false}
-                  initialData={{}}
+                  initialData={{
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    phoneNumber: '',
+                  }}
                   currentUserRole={loggedInUser?.role as AdminRole}
                 />
               </div>
@@ -534,10 +536,10 @@ const UserManagement: React.FC = () => {
                 <UserForm
                   isEditMode={true}
                   initialData={{
-                    name: currentUser.fullName,
+                    firstName: currentUser.firstName,
+                    lastName: currentUser.lastName,
                     email: currentUser.email,
-                    phone: currentUser.phone || '',
-                    roles: currentUser.roles || [currentUser.role as AdminRole]
+                    phoneNumber: currentUser.phoneNumber || '',
                   }}
                   onSubmit={handleEditUserSubmit}
                   currentUserRole={loggedInUser?.role as AdminRole}
