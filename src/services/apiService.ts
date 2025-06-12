@@ -293,8 +293,16 @@ export class ApiService {
     return this.request<{ status: string; message: string }>({ url: '/health', method: 'GET' });
   }
 
-  // Add more endpoints as needed...
+  // System settings endpoints
+  getAllSystemSettings() {
+    return this.request<any[]>({ url: '/system-settings', method: 'GET' });
+  }
+
+  updateSystemSetting(key: string, value: string) {
+    return this.request<any>({ url: `/system-settings/${key}`, method: 'PUT', data: { value } });
+  }
 }
+
 
 // Usage example (in a React component):
 // import { ApiService } from '../services/apiService';
