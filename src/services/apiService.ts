@@ -163,10 +163,11 @@ export class ApiService {
     });
   }
 
-  publishTrackCopyright(id: string) {
+  publishTrackCopyright(id: string, txHash: string) {
     return this.request<{ message: string; txHash: string }>({
       url: `/tracks/${id}/publish`,
       method: 'POST',
+      data: { txHash },
     });
   }
 

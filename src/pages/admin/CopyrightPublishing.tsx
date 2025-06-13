@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { usePayment } from '../../contexts/PaymentContext';
 import { ApiService } from '../../services/apiService';
-import { useAuth } from '../../contexts/AuthContext';
+import { ethers } from 'ethers';
+// @ts-ignore
+import CopyrightRegistryABI from '../../contracts/CopyrightRegistryABI.json';
+
 import { 
   FiMusic, 
   FiFilter, 
@@ -54,7 +57,6 @@ interface Track {
 }
 
 const CopyrightPublishing: React.FC = () => {
-  const auth = useAuth();
   // Create API service with a function that gets the token from localStorage
   const api = new ApiService({ 
     getToken: () => localStorage.getItem('token') || '' 
@@ -83,27 +85,25 @@ const CopyrightPublishing: React.FC = () => {
   const [systemSettings, setSystemSettings] = useState({
     copyrightRegistrationFee: 50000 // Default value in TZS, will be updated from API
   });
+  const [contractAddress, setContractAddress] = useState<string | null>(null);
   const registrationFee = systemSettings.copyrightRegistrationFee
-  
-  // Payment verification
-  const { isPaymentVerified } = usePayment();
 
-  // Fetch system settings
+  // Fetch system settings and contract address
   useEffect(() => {
     const fetchSystemSettings = async () => {
       try {
-        // Simulate API call with timeout
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Mock data for demonstration - in production, this would be a real API call
+        const apiService = new ApiService({ getToken: () => localStorage.getItem('token') || '' });
+        const settings = await apiService.getAllSystemSettings();
+        const map: Record<string, string> = {};
+        settings.forEach((s: any) => { map[s.key] = s.value; });
         setSystemSettings({
-          copyrightRegistrationFee: 25 // This would come from the API
+          copyrightRegistrationFee: Number(map.COPYRIGHT_PAYMENT_AMOUNT) || 50000
         });
+        setContractAddress(map.COPYRIGHT_CONTRACT_ADDRESS || null);
       } catch (error) {
         console.error('Failed to fetch system settings', error);
       }
     };
-    
     fetchSystemSettings();
   }, []);
   
@@ -129,7 +129,7 @@ const CopyrightPublishing: React.FC = () => {
           releaseYear: track.releaseYear || '',
           approvedAt: track.approvedAt || '',
           status: track.status || 'pending',
-          blockchainTxHash: track.blockchainTxHash,
+          blockchainTxHash: track.blockchainTx, // Map blockchainTx to blockchainTxHash
           blockchainTimestamp: track.blockchainTimestamp,
           description: track.description
         }));
@@ -217,30 +217,31 @@ const CopyrightPublishing: React.FC = () => {
     setTransactionStage('init');
   };
   
-  // Wallet connection functions
-  const handleConnectWallet = async () => {
-    setIsConnecting(true);
-    setWalletError(null);
-    
-    try {
-      // Simulate wallet connection delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock successful wallet connection
-      setWallet({
-        address: '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-        balance: parseFloat((Math.random() * 2 + 0.5).toFixed(4)),
-        isConnected: true,
-        network: 'Ethereum Mainnet'
-      });
-      
-      setIsWalletModalOpen(false);
-    } catch (err) {
-      setWalletError('Failed to connect wallet. Please try again.');
-    } finally {
+  // Wallet connection functions (MetaMask)
+
+const handleConnectWallet = async () => {
+  setIsConnecting(true);
+  setWalletError(null);
+  try {
+    if (!(window as any).ethereum) {
+      setWalletError('MetaMask is not installed.');
       setIsConnecting(false);
+      return;
     }
-  };
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    await provider.send('eth_requestAccounts', []);
+    const signer = await provider.getSigner();
+    const address = await signer.getAddress();
+    const balance = parseFloat(ethers.formatEther(await provider.getBalance(address)));
+    const network = (await provider.getNetwork()).name;
+    setWallet({ address, balance, isConnected: true, network });
+    setIsWalletModalOpen(false);
+  } catch (err: any) {
+    setWalletError(err.message || 'Failed to connect wallet. Please try again.');
+  } finally {
+    setIsConnecting(false);
+  }
+};
   
   // Wallet disconnect function is implemented but not used in the current UI
   // It would be used if we add a disconnect button in the wallet display
@@ -250,92 +251,82 @@ const CopyrightPublishing: React.FC = () => {
     setWalletError(null);
   };
   
-  // Simulate blockchain transaction stages
-  const simulateTransaction = async () => {
-    // Initialize transaction
-    setTransactionStage('initializing');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Create transaction
+  // Real blockchain publishing using MetaMask and ethers.js
+const publishCopyrightWithMetaMask = async (track: Track) => {
+  setTransactionStage('initializing');
+  setPublishingProgress(5);
+  try {
+    if (!contractAddress) throw new Error('Smart contract address not loaded');
+    if (!(window as any).ethereum) throw new Error('MetaMask is not installed');
+    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    const signer = await provider.getSigner();
     setTransactionStage('creating');
-    setPublishingProgress(10);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Sign transaction
+    setPublishingProgress(15);
+    // Prepare contract
+    const contract = new ethers.Contract(contractAddress, CopyrightRegistryABI, signer);
+    // Prepare parameters
+    const fingerprint = track.id; // Replace with real fingerprint if available
+    const trackId = track.id;
+    const artistId = track.artist.id;
+    const metadata = JSON.stringify({ title: track.title, artistId: track.artist.id });
     setTransactionStage('signing');
-    setPublishingProgress(25);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Submit transaction
+    setPublishingProgress(30);
+    // Send transaction
+    const tx = await contract.registerCopyright(fingerprint, trackId, artistId, metadata);
     setTransactionStage('submitting');
-    setPublishingProgress(40);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Wait for confirmation
-    setTransactionStage('confirming');
     setPublishingProgress(60);
-    
-    // Generate transaction hash
-    const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    setCurrentTransaction({
-      hash: txHash,
-      status: 'pending',
-      timestamp: new Date().toISOString(),
-      gasUsed: Math.floor(Math.random() * 50000) + 100000,
-      fee: registrationFee
-    });
-    
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Transaction confirmed
+    setCurrentTransaction({ hash: tx.hash, status: 'pending', timestamp: new Date().toISOString() });
+    // Wait for confirmation
+    const receipt = await tx.wait();
     setTransactionStage('confirmed');
     setPublishingProgress(100);
-    setCurrentTransaction(prev => prev ? {...prev, status: 'confirmed'} : null);
-    
-    return txHash;
-  };
+    setCurrentTransaction(prev => prev ? { ...prev, status: 'confirmed', gasUsed: receipt.gasUsed, fee: Number(receipt.gasUsed) * Number(tx.gasPrice) } : null);
+    return tx.hash;
+  } catch (err: any) {
+    setTransactionStage('failed');
+    setCurrentTransaction(prev => prev ? { ...prev, status: 'failed' } : null);
+    throw err;
+  }
+};
 
   const handleSetCopyrightStatus = async () => {
     if (!selectedTrack) return;
-    
-    // Check if wallet is connected
     if (!wallet?.isConnected) {
-      setIsWalletModalOpen(true);
+      setIsModalOpen(false);
+      setTimeout(() => setIsWalletModalOpen(true), 250); // close details, then open wallet modal
       return;
     }
-    
+    if (selectedTrack.status !== 'approved') {
+      setWalletError('Only approved tracks can be published to blockchain.');
+      return;
+    }
     setIsPublishing(true);
     setIsProcessing(true);
-    
     try {
-      // Simulate blockchain transaction
-      const txHash = await simulateTransaction();
-      
-      // Update track status locally
-      setTracks(prevTracks => 
-        prevTracks.map(track => 
-          track.id === selectedTrack.id 
-            ? { 
-                ...track, 
-                status: 'copyrighted', 
+      const txHash = await publishCopyrightWithMetaMask(selectedTrack);
+      // Send txHash to backend to update DB
+      await api.publishTrackCopyright(selectedTrack.id, txHash);
+      setTracks(prevTracks =>
+        prevTracks.map(track =>
+          track.id === selectedTrack.id
+            ? {
+                ...track,
+                status: 'copyrighted',
                 blockchainTxHash: txHash,
-                blockchainTimestamp: new Date().toISOString()
-              } 
+                blockchainTimestamp: new Date().toISOString(),
+              }
             : track
         )
       );
-      
-      // Wait a bit more to show 100% before closing
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Close modal
       setIsModalOpen(false);
       setSelectedTrack(null);
       setIsPublishing(false);
     } catch (err) {
-      console.error('Failed to set copyright status', err);
+      console.error('Failed to publish to blockchain', err);
       setTransactionStage('failed');
-      setCurrentTransaction(prev => prev ? {...prev, status: 'failed'} : null);
+      setCurrentTransaction(prev => prev ? { ...prev, status: 'failed' } : null);
+      setWalletError((err as Error).message || 'Blockchain transaction failed.');
     } finally {
       setIsProcessing(false);
     }
@@ -660,33 +651,33 @@ const CopyrightPublishing: React.FC = () => {
                         <div className="mt-1">{getStatusBadge(selectedTrack.status)}</div>
                       </div>
                       
-                      {selectedTrack.status === 'copyrighted' && (
-                        <>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaction Hash</h4>
-                            <div className="mt-1 flex items-center">
-                              <p className="text-sm text-gray-900 dark:text-white font-mono truncate">
-                                {selectedTrack.blockchainTxHash}
-                              </p>
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(selectedTrack.blockchainTxHash || '');
-                                }}
-                                className="ml-2 text-cosota hover:text-cosota-dark dark:text-cosota-light"
-                              >
-                                <FiLink className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Published At</h4>
-                            <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                              {selectedTrack.blockchainTimestamp ? formatDate(selectedTrack.blockchainTimestamp) : 'N/A'}
+                      {selectedTrack.blockchainTxHash && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaction Hash</h4>
+                          <div className="mt-1 flex items-center">
+                            <p className="text-sm text-gray-900 dark:text-white font-mono truncate">
+                              {selectedTrack.blockchainTxHash}
                             </p>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedTrack.blockchainTxHash || '');
+                              }}
+                              className="ml-2 text-cosota hover:text-cosota-dark dark:text-cosota-light"
+                            >
+                              <FiLink className="h-4 w-4" />
+                            </button>
                           </div>
-                        </>
+                        </div>
+                      )}
+                      
+                      {selectedTrack.blockchainTxHash && selectedTrack.blockchainTimestamp && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Published At</h4>
+                          <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                            {formatDate(selectedTrack.blockchainTimestamp)}
+                          </p>
+                        </div>
                       )}
                       
                       {isPublishing && (
@@ -791,57 +782,43 @@ const CopyrightPublishing: React.FC = () => {
               </div>
               
               <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                {selectedTrack.status === 'approved' && !isPublishing ? (
-                  isPaymentVerified(selectedTrack.id, 'copyright') ? (
-                    <>
+                {selectedTrack.status === 'approved' && !isPublishing && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSetCopyrightStatus}
+                      disabled={isProcessing || !wallet?.isConnected}
+                      className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm ${!wallet?.isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <FiShield className="mr-2 h-5 w-5" />
+                      Set as Copyrighted
+                    </button>
+                    {!wallet?.isConnected && (
                       <button
                         type="button"
-                        onClick={handleSetCopyrightStatus}
-                        disabled={isProcessing}
-                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        onClick={() => {
+                          setIsModalOpen(false);
+                          setTimeout(() => setIsWalletModalOpen(true), 250);
+                        }}
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
                       >
-                        <FiShield className="mr-2 h-5 w-5" />
-                        Set as Copyrighted
+                        <FiWifi className="mr-2 h-5 w-5" />
+                        Connect Wallet
                       </button>
-                      
-                      {wallet?.isConnected ? (
-                        <div className="flex items-center mr-3 text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center bg-green-100 dark:bg-green-900/30 rounded-full px-2 py-1 mr-2">
-                            <div className="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
-                            <span className="text-xs font-medium text-green-800 dark:text-green-400 truncate max-w-[100px]">
-                              {wallet.address.substring(0, 6)}...{wallet.address.substring(wallet.address.length - 4)}
-                            </span>
-                          </div>
-                          <span className="text-xs">
-                            {wallet.balance} ETH
+                    )}
+                    {wallet?.isConnected ? (
+                      <div className="flex items-center mr-3 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center bg-green-100 dark:bg-green-900/30 rounded-full px-2 py-1 mr-2">
+                          <div className="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
+                          <span className="text-xs font-medium text-green-800 dark:text-green-400 truncate max-w-[100px]">
+                            {wallet.address.substring(0, 6)}...{wallet.address.substring(wallet.address.length - 4)}
                           </span>
                         </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={toggleWalletModal}
-                          className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
-                        >
-                          <FiWifi className="mr-2 h-5 w-5" />
-                          Connect Wallet
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="w-full flex flex-col items-center justify-center py-4">
-                      <div className="text-amber-600 dark:text-amber-400 mb-2">
-                        <FiAlertCircle className="h-8 w-8 mx-auto" />
+                        <span className="ml-1">Connected</span>
                       </div>
-                      <h3 className="text-base font-medium text-gray-900 dark:text-white mb-1">
-                        Payment Verification Required
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md">
-                        This track cannot be published until the payment has been verified by the Financial Administrator.
-                        Please check back later or contact the Financial team.
-                      </p>
-                    </div>
-                  )
-                ) : null}
+                    ) : null}
+                  </>
+                )}
                 
                 <button
                   type="button"
@@ -852,6 +829,9 @@ const CopyrightPublishing: React.FC = () => {
                   Close
                 </button>
               </div>
+              {!wallet?.isConnected && (
+                <div className="mt-4 text-xs text-center text-red-500">Connect MetaMask to enable publishing</div>
+              )}
             </div>
           </div>
         </div>
