@@ -15,6 +15,12 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
         "indexed": false,
         "internalType": "string",
         "name": "trackId",
@@ -56,6 +62,12 @@
         "internalType": "string",
         "name": "fingerprint",
         "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
       },
       {
         "indexed": true,
@@ -184,6 +196,26 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "isAdmin",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function",
+    "constant": true
+  },
+  {
+    "inputs": [
+      {
         "internalType": "string",
         "name": "",
         "type": "string"
@@ -196,6 +228,11 @@
     ],
     "name": "licenses",
     "outputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
       {
         "internalType": "address",
         "name": "licensee",
@@ -277,6 +314,11 @@
         "internalType": "string",
         "name": "metadata",
         "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
       }
     ],
     "name": "registerCopyright",
@@ -287,6 +329,24 @@
         "type": "bool"
       }
     ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "enabled",
+        "type": "bool"
+      }
+    ],
+    "name": "setAdmin",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -362,6 +422,11 @@
         "components": [
           {
             "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
             "name": "licensee",
             "type": "address"
           },
@@ -427,4 +492,4 @@
     "type": "function",
     "constant": true
   }
-  ]
+]

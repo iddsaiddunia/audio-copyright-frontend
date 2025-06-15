@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FiCheckCircle, FiList, FiAlertTriangle, FiSearch, FiInfo, FiDatabase } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
+import { ApiService } from '../services/apiService'; // Import ApiService
 
 // Define interfaces for our components
 interface StatCardProps {
@@ -23,6 +24,7 @@ interface ActivityItemProps {
   timestamp: string;
   status: 'verified' | 'registered' | 'approved' | 'pending' | 'rejected' | 'blockchain' | 'processing';
   type: string;
+  txHash?: string;
 }
 
 interface ActivityData {
@@ -31,6 +33,7 @@ interface ActivityData {
   timestamp: string;
   status: 'verified' | 'registered' | 'approved' | 'pending' | 'rejected' | 'blockchain' | 'processing';
   type: string;
+  txHash?: string;
 }
 
 interface StatsData {
@@ -82,7 +85,7 @@ const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon, linkT
 );
 
 // Recent activity item component
-const ActivityItem: React.FC<ActivityItemProps> = ({ title, timestamp, status, type }) => {
+const ActivityItem: React.FC<ActivityItemProps> = ({ title, timestamp, status, type, txHash }) => {
   const getStatusBadge = () => {
     switch (status) {
       case 'verified':
@@ -111,6 +114,11 @@ const ActivityItem: React.FC<ActivityItemProps> = ({ title, timestamp, status, t
       <div className="mt-1 flex items-center">
         <p className="text-sm text-gray-500 dark:text-gray-400 mr-2">{type}</p>
         {getStatusBadge()}
+        {txHash && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+            Tx Hash: {txHash}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -126,49 +134,39 @@ const Dashboard = () => {
   });
 
   const [recentActivity, setRecentActivity] = useState<ActivityData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Simulate loading data
   useEffect(() => {
-    // Simulating API call
-    setTimeout(() => {
-      setStats({
-        registeredTracks: 128,
-        approvedTracks: 87,
-        pendingApprovals: 32,
-        onBlockchain: 76,
-      });
-
-      setRecentActivity([
-        {
-          id: 1,
-          title: 'Bongo Flava Hits',
-          timestamp: '2 hours ago',
-          status: 'approved',
-          type: 'Copyright Approval',
-        },
-        {
-          id: 2,
-          title: 'New Swahili Love Song',
-          timestamp: '5 hours ago',
-          status: 'registered',
-          type: 'Track Registration',
-        },
-        {
-          id: 3,
-          title: 'Taarab Traditional Mix',
-          timestamp: '1 day ago',
-          status: 'blockchain',
-          type: 'Blockchain Publishing',
-        },
-        {
-          id: 4,
-          title: 'Tanzanian Folk Compilation',
-          timestamp: '2 days ago',
-          status: 'pending',
-          type: 'Awaiting COSOTA Review',
-        },
-      ] as ActivityData[]);
-    }, 1000);
+    setIsLoading(true);
+    const fetchDashboardData = async () => {
+      try {
+        const apiService = new ApiService({ getToken: () => localStorage.getItem('token') });
+        const res = await apiService.getPublicDashboard();
+        setStats({
+          registeredTracks: res.stats.totalTracks,
+          approvedTracks: res.stats.approvedTracks,
+          pendingApprovals: res.stats.pendingTracks,
+          onBlockchain: res.stats.blockchainTracks,
+        });
+        setRecentActivity(res.recentActivity
+          .filter((item: any) => item.type === 'track' && item.status === 'blockchain' && item.txHash)
+          .map((item: any, idx: number) => ({
+            id: idx + 1,
+            title: item.title,
+            timestamp: item.timestamp,
+            status: item.status,
+            type: item.type,
+            txHash: item.txHash,
+          }))
+        );
+      } catch (err) {
+        console.error('Failed to fetch dashboard data', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDashboardData();
   }, []);
 
   return (
@@ -244,7 +242,11 @@ const Dashboard = () => {
         <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Activity</h2>
         <div className="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            {recentActivity.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-4">
+                <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+              </div>
+            ) : recentActivity.length > 0 ? (
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {recentActivity.map((activity) => (
                   <ActivityItem
@@ -253,6 +255,7 @@ const Dashboard = () => {
                     timestamp={activity.timestamp}
                     status={activity.status}
                     type={activity.type}
+                    txHash={activity.txHash}
                   />
                 ))}
               </div>

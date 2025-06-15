@@ -11,6 +11,7 @@ import {
   FiShield,
   FiClock
 } from 'react-icons/fi';
+import { ApiService } from '../../services/apiService';
 
 interface StatCardProps {
   title: string;
@@ -60,101 +61,19 @@ const AdminDashboard: React.FC = () => {
   const [recentActivity, setRecentActivity] = useState<ActivityItemProps[]>([]);
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch dashboard data
-    // For demo purposes, we'll use mock data
     const fetchDashboardData = async () => {
       setIsLoading(true);
-      
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock statistics
-        setStats({
-          totalArtists: 124,
-          pendingArtists: 7,
-          totalTracks: 562,
-          pendingTracks: 18,
-          approvedTracks: 489,
-          rejectedTracks: 55,
-          blockchainTracks: 412,
-          pendingLicenses: 12,
-          totalLicenses: 87,
-          blockchainLicenses: 65,
-          totalTransfers: 43,
-          blockchainTransfers: 38,
-          totalBlockchainRegistrations: 515, // Sum of all blockchain registrations
-          blockchainFees: 12875 // Total fees collected in TZS
-        });
-        
-        // Mock recent activity
-        setRecentActivity([
-          {
-            title: 'New Artist Registration',
-            description: 'Maria Joseph submitted registration documents',
-            timestamp: '2025-05-22T13:45:00Z',
-            status: 'pending',
-            type: 'artist'
-          },
-          {
-            title: 'Track Approved',
-            description: 'Serengeti Sunset by John Doe',
-            timestamp: '2025-05-22T11:30:00Z',
-            status: 'approved',
-            type: 'track'
-          },
-          {
-            title: 'Copyright Published',
-            description: 'Zanzibar Nights by John Doe published to blockchain',
-            timestamp: '2025-05-22T10:15:00Z',
-            status: 'blockchain',
-            type: 'copyright',
-            txHash: '0x3a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b'
-          },
-          {
-            title: 'License Registered',
-            description: 'TBC Radio license for African Sunrise registered on blockchain',
-            timestamp: '2025-05-22T09:45:00Z',
-            status: 'blockchain',
-            type: 'license',
-            txHash: '0x7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e'
-          },
-          {
-            title: 'License Request Pending',
-            description: 'TBC Radio requested license for African Sunrise',
-            timestamp: '2025-05-22T09:20:00Z',
-            status: 'pending',
-            type: 'license'
-          },
-          {
-            title: 'Ownership Transfer',
-            description: 'Kilimanjaro Blues transferred from Sarah Kimani to James Omondi',
-            timestamp: '2025-05-22T08:30:00Z',
-            status: 'blockchain',
-            type: 'transfer',
-            txHash: '0x2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e'
-          },
-          {
-            title: 'Artist Verified',
-            description: 'Robert Mbuki registration approved',
-            timestamp: '2025-05-21T16:45:00Z',
-            status: 'verified',
-            type: 'artist'
-          },
-          {
-            title: 'Track Rejected',
-            description: 'Insufficient documentation for Dar es Salaam Groove',
-            timestamp: '2025-05-21T14:30:00Z',
-            status: 'rejected',
-            type: 'track'
-          }
-        ]);
+        const apiService = new ApiService({ getToken: () => localStorage.getItem('token') });
+        const res = await apiService.getAdminDashboard();
+        setStats(res.stats);
+        setRecentActivity(res.recentActivity);
       } catch (err) {
         console.error('Failed to fetch dashboard data', err);
       } finally {
         setIsLoading(false);
       }
     };
-    
     fetchDashboardData();
   }, []);
 

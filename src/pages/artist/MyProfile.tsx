@@ -19,6 +19,8 @@ interface UserProfile {
   walletAddress: string;
   profileImageUrl: string | null;
   joinedDate: string;
+  isVerified: boolean;
+  status: string;
 }
 
 const MyProfile: React.FC = () => {
@@ -30,27 +32,30 @@ const MyProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the user's profile
-    // For demo purposes, we'll use mock data
+    // Fetch artist profile from API
     const fetchProfile = async () => {
       setIsLoading(true);
-      
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const mockProfile: UserProfile = {
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'artist@example.com',
-          phoneNumber: '+255 123 456 789',
-          idNumber: 'TZ-12345678',
-          walletAddress: '0x1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t',
-          profileImageUrl: null,
-          joinedDate: '2025-01-15T08:30:00Z'
+        // Dynamically import ApiService to avoid circular deps
+        const { ApiService } = await import('../../services/apiService');
+        const api = new ApiService({ getToken: () => localStorage.getItem('token') });
+        const user = await api.getCurrentUser();
+        // Map backend user fields to UserProfile interface
+        const userProfile: UserProfile = {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phoneNumber: user.phoneNumber || '',
+          idNumber: user.idNumber || '',
+          walletAddress: user.walletAddress || '',
+          profileImageUrl: user.profileImageUrl || null,
+          joinedDate: user.createdAt || '',
+          isVerified: user.isVerified ?? false,
+          status: user.status || ''
         };
-        
-        setProfile(mockProfile);
-        setEditedProfile(mockProfile);
+
+        setProfile(userProfile);
+        setEditedProfile(userProfile);
       } catch (err) {
         setError('Failed to load profile data');
       } finally {
@@ -183,8 +188,32 @@ const MyProfile: React.FC = () => {
             <FiUser className="h-10 w-10 text-cosota" />
           </div>
           <div>
-            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center gap-2">
               {profile.firstName} {profile.lastName}
+              {/* Verified Tag */}
+              {profile.isVerified ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
+                  Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 ml-2">
+                  Unverified
+                </span>
+              )}
+              {/* Status Tag */}
+              {profile.status === 'active' ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-2">
+                  Active
+                </span>
+              ) : profile.status === 'suspended' ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 ml-2">
+                  Suspended
+                </span>
+              ) : profile.status ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 ml-2">
+                  {profile.status.charAt(0).toUpperCase() + profile.status.slice(1)}
+                </span>
+              ) : null}
             </h3>
             <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
               Artist • Joined {formatDate(profile.joinedDate)}

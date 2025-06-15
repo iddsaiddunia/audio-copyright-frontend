@@ -148,11 +148,11 @@ export class ApiService {
     });
   }
 
-  publishLicenseToBlockchain(id: string, blockchainTx: string, certificateUrl: string) {
+  publishLicenseToBlockchain(licenseId: string, blockchainTx: string) {
     return this.request<any>({
-      url: `/licenses/${id}/publish`,
+      url: `/licenses/${licenseId}/publish`,
       method: 'POST',
-      data: { blockchainTx, certificateUrl }
+      data: { blockchainTx },
     });
   }
 
@@ -204,7 +204,8 @@ export class ApiService {
     return this.request<any>({ url: `/payments/${id}/invoice`, method: 'POST' });
   }
 
-  // Licensing & Transfer
+
+
   issueLicense(trackId: string, data: any) {
     return this.request<any>({ url: `/licensing/${trackId}/issue`, method: 'POST', data });
   }
@@ -244,6 +245,14 @@ export class ApiService {
       url: `/transfers/${trackId}/publish`,
       method: 'POST',
       data: { blockchainTx, certificateUrl },
+    });
+  }
+
+  // Admin dashboard endpoint
+  getAdminDashboard() {
+    return this.request<{ stats: any; recentActivity: any[] }>({
+      url: '/admin/dashboard',
+      method: 'GET',
     });
   }
 
@@ -301,6 +310,11 @@ export class ApiService {
 
   updateSystemSetting(key: string, value: string) {
     return this.request<any>({ url: `/system-settings/${key}`, method: 'PUT', data: { value } });
+  }
+
+  // Fetch public dashboard data (no auth)
+  getPublicDashboard() {
+    return axios.get(`${API_BASE_URL}/dashboard`).then(r => r.data);
   }
 }
 

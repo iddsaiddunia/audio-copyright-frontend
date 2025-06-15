@@ -46,6 +46,7 @@ interface Track {
   artist: {
     id: string;
     name: string;
+    walletAddress: string;
   };
   genre: string;
   releaseYear: string;
@@ -54,6 +55,7 @@ interface Track {
   blockchainTxHash?: string;
   blockchainTimestamp?: string;
   description?: string;
+  fingerprint: string;
 }
 
 const CopyrightPublishing: React.FC = () => {
@@ -88,25 +90,26 @@ const CopyrightPublishing: React.FC = () => {
   const [contractAddress, setContractAddress] = useState<string | null>(null);
   const registrationFee = systemSettings.copyrightRegistrationFee
 
-  // Fetch system settings and contract address
+  // Combine system settings and contract address fetch into a single useEffect and state update
   useEffect(() => {
     const fetchSystemSettings = async () => {
       try {
-        const apiService = new ApiService({ getToken: () => localStorage.getItem('token') || '' });
-        const settings = await apiService.getAllSystemSettings();
+        const settings = await api.getAllSystemSettings();
         const map: Record<string, string> = {};
         settings.forEach((s: any) => { map[s.key] = s.value; });
         setSystemSettings({
-          copyrightRegistrationFee: Number(map.COPYRIGHT_PAYMENT_AMOUNT) || 50000
+          copyrightRegistrationFee: Number(map.COPYRIGHT_PAYMENT_AMOUNT) || 50000,
+          // add other settings as needed
         });
         setContractAddress(map.COPYRIGHT_CONTRACT_ADDRESS || null);
-      } catch (error) {
-        console.error('Failed to fetch system settings', error);
+      } catch (err) {
+        setSystemSettings({ copyrightRegistrationFee: 50000 });
+        setContractAddress(null);
       }
     };
     fetchSystemSettings();
   }, []);
-  
+
   // Fetch tracks on component mount
   useEffect(() => {
     const fetchTracks = async () => {
@@ -121,9 +124,10 @@ const CopyrightPublishing: React.FC = () => {
           title: track.title,
           artist: {
             id: track.artist?.id || '',
-            name: track.artist?.firstName && track.artist?.lastName ? 
-              `${track.artist.firstName} ${track.artist.lastName}` : 
-              track.artist?.email || 'Unknown Artist'
+            name: track.artist?.firstName && track.artist?.lastName 
+              ? `${track.artist.firstName} ${track.artist.lastName}` 
+              : track.artist?.email || 'Unknown Artist',
+            walletAddress: track.artist?.walletAddress || '',
           },
           genre: track.genre || 'Unknown',
           releaseYear: track.releaseYear || '',
@@ -131,43 +135,14 @@ const CopyrightPublishing: React.FC = () => {
           status: track.status || 'pending',
           blockchainTxHash: track.blockchainTx, // Map blockchainTx to blockchainTxHash
           blockchainTimestamp: track.blockchainTimestamp,
-          description: track.description
+          description: track.description,
+          fingerprint: track.fingerprint || '',
         }));
         
         setTracks(formattedTracks);
       } catch (error) {
         console.error('Failed to fetch tracks:', error);
-        // Fallback to mock data for development/testing
-        setTracks([
-          {
-            id: '2',
-            title: 'Zanzibar Nights',
-            artist: {
-              id: '1',
-              name: 'John Doe'
-            },
-            genre: 'Afrobeat',
-            releaseYear: '2024',
-            approvedAt: '2025-05-15T09:45:00Z',
-            status: 'copyrighted',
-            blockchainTxHash: '0x3a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b',
-            blockchainTimestamp: '2025-05-16T10:22:33Z',
-            description: 'A celebration of the vibrant nightlife in Stone Town, Zanzibar.'
-          },
-          {
-            id: '3',
-            title: 'Kilimanjaro Dreams',
-            artist: {
-              id: '2',
-              name: 'Maria Joseph'
-            },
-            genre: 'Taarab',
-            releaseYear: '2025',
-            approvedAt: '2025-05-10T11:20:00Z',
-            status: 'approved',
-            description: 'A musical journey inspired by climbing Mount Kilimanjaro.'
-          }
-        ]);
+        setTracks([]); // No fallback mock data
       } finally {
         setIsLoading(false);
       }
@@ -265,14 +240,15 @@ const publishCopyrightWithMetaMask = async (track: Track) => {
     // Prepare contract
     const contract = new ethers.Contract(contractAddress, CopyrightRegistryABI, signer);
     // Prepare parameters
-    const fingerprint = track.id; // Replace with real fingerprint if available
+    const fingerprint = track.fingerprint || track.id;
     const trackId = track.id;
     const artistId = track.artist.id;
     const metadata = JSON.stringify({ title: track.title, artistId: track.artist.id });
+    const owner = track.artist.walletAddress;
     setTransactionStage('signing');
     setPublishingProgress(30);
     // Send transaction
-    const tx = await contract.registerCopyright(fingerprint, trackId, artistId, metadata);
+    const tx = await contract.registerCopyright(fingerprint, trackId, artistId, metadata, owner);
     setTransactionStage('submitting');
     setPublishingProgress(60);
     setCurrentTransaction({ hash: tx.hash, status: 'pending', timestamp: new Date().toISOString() });
@@ -446,15 +422,13 @@ const publishCopyrightWithMetaMask = async (track: Track) => {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
-          ) : filteredTracks.length === 0 ? (
-            <div className="text-center py-10">
-              <FiMusic className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No tracks found</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {tracks.length === 0 
-                  ? "There are no tracks to publish." 
-                  : "No tracks match your current filters."}
-              </p>
+          ) : !filteredTracks.length ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
+              <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              <h2 className="text-lg font-semibold">No tracks found</h2>
+              <p className="mt-2 text-sm">There are no tracks available for publishing. Please check back later or upload new tracks.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">

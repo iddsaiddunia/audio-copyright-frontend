@@ -17,11 +17,44 @@ const LicensePublish: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [selectedLicense, setSelectedLicense] = useState<License | null>(null);
-  const [blockchainTx, setBlockchainTx] = useState('');
-  const [certificateUrl, setCertificateUrl] = useState('');
+  // Wallet and blockchain states (mirroring CopyrightPublishing)
+  const [wallet, setWallet] = useState<null | { address: string; balance: number; isConnected: boolean; network: string }>(null);
+
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [currentTransaction, setCurrentTransaction] = useState<null | { hash: string; status: 'pending' | 'confirmed' | 'failed'; timestamp: string; gasUsed?: number; fee?: number }>(null);
+  const [transactionStage, setTransactionStage] = useState<string>('init');
+  const [publishingProgress, setPublishingProgress] = useState(0);
+
+  // Wallet connection logic (MetaMask)
+  const handleConnectWallet = async () => {
+    setIsConnecting(true);
+    setWalletError(null);
+    try {
+      if (!(window as any).ethereum) {
+        setWalletError('MetaMask is not installed.');
+        setIsConnecting(false);
+        return;
+      }
+      const ethers = await import('ethers');
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      await provider.send('eth_requestAccounts', []);
+      const signer = await provider.getSigner();
+      const address = await signer.getAddress();
+      const balance = parseFloat(ethers.ethers.formatEther(await provider.getBalance(address)));
+      const network = (await provider.getNetwork()).name;
+      setWallet({ address, balance, isConnected: true, network });
+    } catch (err: any) {
+      setWalletError(err.message || 'Failed to connect wallet. Please try again.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [detailsModal, setDetailsModal] = useState<{open: boolean, license: License | null}>({open: false, license: null});
+  // Remove detailsModal; use only selectedLicense for modal state
 
   useEffect(() => {
     if (allowed) fetchLicenses();
@@ -41,21 +74,86 @@ const LicensePublish: React.FC = () => {
     }
   };
 
+  // Blockchain publishing logic (mirroring CopyrightPublishing)
+  const publishLicenseWithMetaMask = async (license: License) => {
+    setTransactionStage('initializing');
+    setPublishingProgress(5);
+    try {
+      const ethers = await import('ethers');
+      const { default: abi } = await import('../../contracts/CopyrightRegistryABI.json');
+      // Fetch contract address from backend system settings
+      const settings = await apiService.getAllSystemSettings();
+      const contractAddr = settings.find((s: any) => s.key === 'COPYRIGHT_CONTRACT_ADDRESS')?.value;
+      if (!contractAddr) throw new Error('Smart contract address not configured.');
+      if (!(window as any).ethereum) throw new Error('MetaMask is not installed');
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      setTransactionStage('creating');
+      setPublishingProgress(15);
+      // Prepare contract call
+      const contract = new ethers.Contract(contractAddr, abi, signer);
+      // Gather required fields
+      const fingerprint = license.track && typeof license.track === 'object' && 'fingerprint' in license.track && license.track.fingerprint ? license.track.fingerprint : license.trackId;
+      const licensee = (license.requester && typeof license.requester === 'object' && 'walletAddress' in license.requester && license.requester.walletAddress)
+        ? license.requester.walletAddress
+        : license.requesterId;
+      // owner is not needed for contract call; remove unused variable
+      const terms = license.purpose;
+      const duration = license.duration * 30 * 24 * 60 * 60; // months to seconds
+      setTransactionStage('signing');
+      setPublishingProgress(30);
+      // Log what we are about to publish
+      console.log('[LicensePublish] Publishing license with:', {
+        contractAddr,
+        fingerprint,
+        licensee,
+        terms,
+        duration,
+        license
+      });
+      // Send transaction
+      const tx = await contract.issueLicense(fingerprint, licensee, terms, duration, { gasLimit: 500000 });
+      setTransactionStage('submitting');
+      setPublishingProgress(60);
+      setCurrentTransaction({ hash: tx.hash, status: 'pending', timestamp: new Date().toISOString() });
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      setTransactionStage('confirmed');
+      setPublishingProgress(100);
+      setCurrentTransaction(prev => prev ? { ...prev, status: 'confirmed', gasUsed: receipt.gasUsed, fee: Number(receipt.gasUsed) * Number(tx.gasPrice) } : null);
+      return tx.hash;
+    } catch (err: any) {
+      setTransactionStage('failed');
+      setCurrentTransaction(prev => prev ? { ...prev, status: 'failed' } : null);
+      throw err;
+    }
+  };
+
   const handlePublish = async () => {
     if (!selectedLicense) return;
+    if (!wallet?.isConnected) {
+      return;
+    }
     setIsPublishing(true);
     try {
-      await apiService.publishLicenseToBlockchain(selectedLicense.id, blockchainTx, certificateUrl);
+      const txHash = await publishLicenseWithMetaMask(selectedLicense);
+      await apiService.publishLicenseToBlockchain(selectedLicense.id, txHash);
+      setLicenses(prevLicenses =>
+        prevLicenses.map(lic =>
+          lic.id === selectedLicense.id
+            ? { ...lic, status: 'published', blockchainTxHash: txHash, blockchainTimestamp: new Date().toISOString() }
+            : lic
+        )
+      );
+      await new Promise(resolve => setTimeout(resolve, 2000));
       setSelectedLicense(null);
-      setBlockchainTx('');
-      setCertificateUrl('');
-      await fetchLicenses();
-    } catch (error) {
-      console.error('Error publishing license:', error);
+    } catch (err: any) {
+      setWalletError(err.message || 'Failed to publish license.');
     } finally {
       setIsPublishing(false);
     }
   };
+
 
   // Use status badge color logic from CopyrightPublishing for consistency
   const getStatusBadge = (status: string) => {
@@ -179,7 +277,7 @@ const LicensePublish: React.FC = () => {
                   <td className={`px-6 py-4 whitespace-nowrap`}>
                     <button
                       className="inline-flex items-center px-3 py-1 bg-cosota text-white rounded hover:bg-cosota-dark text-xs"
-                      onClick={() => setDetailsModal({open: true, license})}
+                      onClick={() => setSelectedLicense(license)}
                     >
                       View Details
                     </button>
@@ -190,81 +288,154 @@ const LicensePublish: React.FC = () => {
           </table>
         )}
       </div>
-      {/* Publish Modal */}
+      {/* Unified Publish Modal (mirrors CopyrightPublishing) */}
       {selectedLicense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Publish License to Blockchain</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Blockchain TX</label>
-              <input
-                type="text"
-                className="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                value={blockchainTx}
-                onChange={e => setBlockchainTx(e.target.value)}
-                placeholder="Enter blockchain transaction hash"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Certificate URL</label>
-              <input
-                type="text"
-                className="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                value={certificateUrl}
-                onChange={e => setCertificateUrl(e.target.value)}
-                placeholder="Enter certificate URL (optional)"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-                onClick={() => setSelectedLicense(null)}
-                disabled={isPublishing}
-              >Cancel</button>
-              <button
-                className="px-4 py-2 rounded bg-cosota text-white hover:bg-cosota-dark"
-                onClick={handlePublish}
-                disabled={isPublishing || !blockchainTx}
-              >{isPublishing ? 'Publishing...' : 'Publish'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {detailsModal.open && detailsModal.license && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-lg">
-            <h2 className="text-lg font-semibold mb-4">License Request Details</h2>
-            <div className="mb-2"><b>Track:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.track?.title || detailsModal.license.trackId}</span></div>
-            <div className="mb-2"><b>Owner:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.owner ? `${detailsModal.license.owner.firstName} ${detailsModal.license.owner.lastName}` : detailsModal.license.ownerId}</span></div>
-            <div className="mb-2"><b>Licensee:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.requester ? `${detailsModal.license.requester.firstName} ${detailsModal.license.requester.lastName}` : detailsModal.license.requesterId}</span></div>
-            <div className="mb-2"><b>Status:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.status}</span></div>
-            <div className="mb-2"><b>Purpose:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.purpose}</span></div>
-            <div className="mb-2"><b>Duration:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.duration}</span></div>
-            <div className="mb-2"><b>Territory:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.territory}</span></div>
-            <div className="mb-2"><b>Usage Type:</b> <span className="text-gray-900 dark:text-white">{detailsModal.license.usageType}</span></div>
-            <div className="mb-2"><b>Payments:</b> {detailsModal.license.payments && detailsModal.license.payments.length > 0 ? (
+            <h2 className="text-lg font-semibold mb-4">License Details & Blockchain Publishing</h2>
+            <div className="mb-2"><b>Track:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.track?.title || selectedLicense.trackId}</span></div>
+            <div className="mb-2"><b>Owner:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.owner ? `${selectedLicense.owner.firstName} ${selectedLicense.owner.lastName}` : selectedLicense.ownerId}</span></div>
+            <div className="mb-2"><b>Licensee:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.requester ? `${selectedLicense.requester.firstName} ${selectedLicense.requester.lastName}` : selectedLicense.requesterId}</span></div>
+            <div className="mb-2"><b>Status:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.status}</span></div>
+            <div className="mb-2"><b>Purpose:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.purpose}</span></div>
+            <div className="mb-2"><b>Duration:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.duration}</span></div>
+            <div className="mb-2"><b>Territory:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.territory}</span></div>
+            <div className="mb-2"><b>Usage Type:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.usageType}</span></div>
+            <div className="mb-2"><b>Payments:</b> {selectedLicense.payments && selectedLicense.payments.length > 0 ? (
               <ul className="list-disc ml-5">
-                {detailsModal.license.payments.map(p => (
+                {selectedLicense.payments.map(p => (
                   <li key={p.id}><span className="text-gray-900 dark:text-white">Amount: {p.amount}, Status: {p.status}, Paid At: {p.paidAt || 'N/A'}</span></li>
                 ))}
               </ul>
             ) : <span className="text-gray-900 dark:text-white">No payments found</span>}
             </div>
-            <div className="flex justify-end mt-6 gap-2">
+
+            {/* Wallet connection and status */}
+            {!wallet?.isConnected ? (
+              <div className="mt-4">
+                <button
+                  className="mb-2 px-4 py-2 rounded bg-blue-600 text-white w-full"
+                  onClick={handleConnectWallet}
+                  disabled={isConnecting}
+                >{isConnecting ? 'Connecting...' : 'Connect Wallet'}</button>
+                {walletError && <div className="text-red-600 text-sm mb-2">{walletError}</div>}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mt-4 mb-2">
+                <div className="flex items-center bg-green-100 dark:bg-green-900/30 rounded-full px-2 py-1">
+                  <div className="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
+                  <span className="text-xs font-medium text-green-800 dark:text-green-400 truncate max-w-[100px]">
+                    {wallet.address.substring(0, 6)}...{wallet.address.substring(wallet.address.length - 4)}
+                  </span>
+                </div>
+                <span className="ml-1 text-sm text-gray-500 dark:text-gray-400">Connected</span>
+              </div>
+            )}
+
+            {/* Transaction progress/status */}
+            {isPublishing && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaction Progress</h4>
+                  <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+                    <div 
+                      className="bg-cosota h-2.5 rounded-full" 
+                      style={{ width: `${publishingProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
+                    {publishingProgress}% Complete
+                  </p>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Transaction Details</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Status:</span>
+                      <span className="text-xs font-medium">
+                        {transactionStage === 'initializing' && (
+                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Initializing</span>
+                        )}
+                        {transactionStage === 'creating' && (
+                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Creating Transaction</span>
+                        )}
+                        {transactionStage === 'signing' && (
+                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Signing Transaction</span>
+                        )}
+                        {transactionStage === 'submitting' && (
+                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Submitting to Blockchain</span>
+                        )}
+                        {transactionStage === 'confirmed' && (
+                          <span className="text-green-600 dark:text-green-400 flex items-center">Confirmed</span>
+                        )}
+                        {transactionStage === 'failed' && (
+                          <span className="text-red-600 dark:text-red-400 flex items-center">Failed</span>
+                        )}
+                      </span>
+                    </div>
+                    {currentTransaction && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Transaction Hash:</span>
+                          <span className="text-xs font-mono text-gray-900 dark:text-gray-200 truncate max-w-[200px]">
+                            {currentTransaction.hash.substring(0, 10)}...{currentTransaction.hash.substring(currentTransaction.hash.length - 8)}
+                            <button 
+                              onClick={() => navigator.clipboard.writeText(currentTransaction.hash)}
+                              className="ml-1 text-cosota hover:text-cosota-dark inline-flex items-center"
+                            >
+                              <FiExternalLink className="h-3 w-3" />
+                            </button>
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Gas Used:</span>
+                          <span className="text-xs font-medium text-gray-900 dark:text-gray-200">
+                            {currentTransaction.gasUsed?.toLocaleString()} units
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Fee:</span>
+                          <span className="text-xs font-medium text-gray-900 dark:text-gray-200">
+                            {currentTransaction.fee} ETH
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error/Success feedback */}
+            {walletError && !isPublishing && (
+              <div className="text-red-600 text-sm mt-2">{walletError}</div>
+            )}
+            {transactionStage === 'confirmed' && currentTransaction && (
+              <div className="text-green-600 text-sm mt-2">
+                Transaction successful! TxHash: <a href={`https://etherscan.io/tx/${currentTransaction.hash}`} target="_blank" rel="noopener noreferrer" className="underline">{currentTransaction.hash}</a>
+              </div>
+            )}
+            {transactionStage === 'failed' && (
+              <div className="text-red-600 text-sm mt-2">Blockchain transaction failed.</div>
+            )}
+
+            {/* Modal actions */}
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                onClick={() => { setSelectedLicense(null); setPublishingProgress(0); setCurrentTransaction(null); setTransactionStage('init'); setWalletError(null); }}
+                disabled={isPublishing}
+              >Close</button>
               <button
                 className="px-4 py-2 rounded bg-cosota text-white hover:bg-cosota-dark"
-                onClick={() => {
-                  setSelectedLicense(detailsModal.license);
-                  setDetailsModal({open: false, license: null});
-                }}
-              >
-                Publish to Chain
-              </button>
-              <button onClick={() => setDetailsModal({open: false, license: null})} className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Close</button>
+                onClick={handlePublish}
+                disabled={isPublishing || !wallet?.isConnected}
+              >{isPublishing ? 'Publishing...' : 'Publish to Blockchain'}</button>
             </div>
           </div>
         </div>
       )}
+
     </motion.div>
   );
 };
