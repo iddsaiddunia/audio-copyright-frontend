@@ -88,7 +88,7 @@ const TrackApprovals: React.FC = () => {
     setIsRejecting(false);
     setIsSubmittingRejection(false);
     setApprovalProgress([]);
-    setRejectionReason('');
+    setRejectionReason("");
     // Audio player reset
     if (audioRef.current) {
       audioRef.current.pause();
@@ -142,12 +142,12 @@ const TrackApprovals: React.FC = () => {
 
     setIsSubmittingRejection(true);
     try {
-      await apiService.rejectTrack(selectedTrack.id);
+      await apiService.rejectTrack(selectedTrack.id, rejectionReason);
       
       // Update track status in the UI
       setTracks(prevTracks =>
         prevTracks.map(track =>
-          track.id === selectedTrack.id ? { ...track, status: 'rejected' } : track
+          track.id === selectedTrack.id ? { ...track, status: 'rejected', rejectionReason } : track
         )
       );
       
@@ -372,6 +372,9 @@ const TrackApprovals: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={getStatusBadge(track.status)}>{track.status}</span>
+{track.status === 'rejected' && track.rejectionReason && (
+  <div className="text-xs text-red-600 dark:text-red-400 mt-1">Reason: {track.rejectionReason}</div>
+)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${track.paymentStatus === 'approved' || track.paymentStatus === 'verified' ? 'bg-green-100 text-green-800' : track.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -480,30 +483,25 @@ const TrackApprovals: React.FC = () => {
                           <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Title</h4>
                           <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.title}</p>
                         </div>
-                        
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Artist</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{((selectedTrack.artist?.firstName && selectedTrack.artist?.lastName) ? `${selectedTrack.artist.firstName} ${selectedTrack.artist.lastName}` : (selectedTrack.artist?.email ?? 'Unknown Artist'))}</p>
-                        </div>
-                        
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Genre</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.genre}</p>
-                        </div>
-                        
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Release Year</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.releaseYear}</p>
-                        </div>
-                        
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h4>
-                          <div className="mt-1"><span className={getStatusBadge(selectedTrack.status)}>{selectedTrack.status}</span></div>
-                        </div>
-                        
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.createdAt ? formatDate(selectedTrack.createdAt) : 'N/A'}</p>
+                        <div className="flex flex-col gap-4 mt-4">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Artist</h4>
+                            <p className="mt-1 text-sm text-gray-900 dark:text-white">{((selectedTrack.artist?.firstName && selectedTrack.artist?.lastName) ? `${selectedTrack.artist.firstName} ${selectedTrack.artist.lastName}` : (selectedTrack.artist?.email ?? 'Unknown Artist'))}</p>
+                          </div>
+                          {selectedTrack.status === 'rejected' && selectedTrack.rejectionReason && (
+                            <div>
+                              <h4 className="text-sm font-medium text-red-600 dark:text-red-400">Rejection Reason</h4>
+                              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{selectedTrack.rejectionReason}</p>
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Genre</h4>
+                            <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.genre}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</h4>
+                            <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.createdAt ? formatDate(selectedTrack.createdAt) : 'N/A'}</p>
+                          </div>
                         </div>
                       </div>
                       

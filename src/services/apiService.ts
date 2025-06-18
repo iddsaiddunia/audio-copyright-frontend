@@ -105,8 +105,8 @@ export class ApiService {
     return this.request<any>({ url: `/tracks/${id}/approve`, method: 'POST' });
   }
 
-  rejectTrack(id: string) {
-    return this.request<any>({ url: `/tracks/${id}/reject`, method: 'POST' });
+  rejectTrack(id: string, reason: string) {
+    return this.request<any>({ url: `/tracks/${id}/reject`, method: 'POST', data: { reason } });
   }
 
   // License endpoints

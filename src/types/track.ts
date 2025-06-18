@@ -30,6 +30,7 @@ export interface Track {
   duration?: number;
   fingerprint?: string;
   status: 'pending' | 'approved' | 'rejected' | 'copyrighted';
+  rejectionReason?: string | null;
   blockchainTx?: string;
   submittedAt?: string;
   createdAt: string;
