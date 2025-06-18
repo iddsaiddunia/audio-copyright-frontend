@@ -1,42 +1,38 @@
-import { useState, useEffect } from 'react';
-import { ApiService } from '../../services/apiService';
-const apiService = new ApiService({ getToken: () => localStorage.getItem('token') });
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { FiSearch, FiFilter, FiChevronDown, FiChevronUp, FiMusic, FiEye, FiEyeOff, FiFileText, FiPlay, FiPause, FiAlertCircle, FiCheckCircle, FiXCircle, FiLoader } from 'react-icons/fi';
+import { ApiService } from '../../services/apiService';
 import { usePayment } from '../../contexts/PaymentContext';
-import { FiAlertCircle } from 'react-icons/fi';
-import { 
-  FiMusic, 
-  FiFilter, 
-  FiSearch, 
-  FiChevronDown, 
-  FiChevronUp,
-  FiPlay,
-  FiPause,
-  FiFileText,
-  FiEye,
-  FiEyeOff
-} from 'react-icons/fi';
+import type { Track } from '../../types/track';
 
-// Track interface
-interface Track {
-  id: string;
-  title: string;
-  artist: {
-    id: string;
-    name: string;
-  };
-  genre: string;
-  releaseYear: string;
-  submittedAt: string;
-  status: 'pending' | 'approved' | 'rejected' | 'copyrighted';
-  description?: string;
-  lyrics?: string;
-  audioFileName: string;
-  isAvailableForLicensing: boolean;
-  paymentStatus?: string;
-}
+// Helper function to format date
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+// Helper to get status badge styles
+const getStatusBadge = (status: string) => {
+  const baseClasses = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full';
+  switch (status) {
+    case 'pending':
+      return `${baseClasses} bg-yellow-100 text-yellow-800`;
+    case 'approved':
+      return `${baseClasses} bg-green-100 text-green-800`;
+    case 'rejected':
+      return `${baseClasses} bg-red-100 text-red-800`;
+    case 'copyrighted':
+      return `${baseClasses} bg-purple-100 text-purple-800`;
+    default:
+      return `${baseClasses} bg-gray-100 text-gray-800`;
+  }
+};
 
 const TrackApprovals: React.FC = () => {
+  const apiService = useMemo(() => new ApiService({ getToken: () => localStorage.getItem('token') }), []);
   // State management
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,320 +43,150 @@ const TrackApprovals: React.FC = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false); // This will now control the visibility of the rejection reason input
+  const [isSubmittingRejection, setIsSubmittingRejection] = useState(false); // For the loading state of the confirm button
+  const [approvalProgress, setApprovalProgress] = useState<{ step: string; status: string; message: string; data?: any }[]>([]);
   const [rejectionReason, setRejectionReason] = useState('');
+  
   // Audio player states
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showLyrics, setShowLyrics] = useState(true);
-  
+
   // Payment verification
-  const { isPaymentVerified, isPendingVerification } = usePayment();
+  const { isPendingVerification } = usePayment();
 
   // Fetch tracks on component mount
   useEffect(() => {
     const fetchTracks = async () => {
       setIsLoading(true);
-      
       try {
-        // Fetch all tracks for admin
-        const response = await apiService.getAllTracks();
-        
-        // Debug: Log raw API response
-        console.log('Raw API response for tracks:', response);
-        
-        // Map response to Track interface, including artist name and payment status
-        const mapped = response.map((track: any) => {
-          // Debug: Log individual track data
-          console.log('Processing track:', {
-            id: track.id,
-            title: track.title,
-            paymentStatus: track.paymentStatus,
-            paymentData: track.payments,
-            status: track.status
-          });
-          
-          return {
-            id: track.id,
-            title: track.title,
-            artist: {
-              id: track.artist?.id || '',
-              name: track.artist ? `${track.artist.firstName || ''} ${track.artist.lastName || ''}`.trim() : 'Unknown',
-            },
-            genre: track.genre,
-            releaseYear: track.releaseYear,
-            submittedAt: track.createdAt || track.submittedAt || '',
-            status: track.status || (track.isVerified ? 'approved' : 'pending'),
-            description: track.description,
-            lyrics: track.lyrics,
-            audioFileName: track.filename || track.audioFileName,
-            isAvailableForLicensing: track.isAvailableForLicensing,
-            paymentStatus: track.paymentStatus || (track.payment ? track.payment.status : undefined),
-          };
-        });
-        setTracks(mapped);
-      } catch (err) {
-        console.error('Failed to fetch tracks', err);
+        const fetchedTracks = await apiService.getAllTracks();
+        setTracks(fetchedTracks);
+      } catch (error) {
+        console.error('Failed to fetch tracks:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    
     fetchTracks();
   }, []);
 
-  // Helper functions
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Approved</span>;
-      case 'pending':
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pending</span>;
-      case 'rejected':
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Rejected</span>;
-      case 'copyrighted':
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">Copyrighted</span>;
-      default:
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Unknown</span>;
-    }
-  };
-
-  const toggleFilter = () => {
-    setIsFilterOpen(!isFilterOpen);
-  };
+  const toggleFilter = () => setIsFilterOpen(!isFilterOpen);
 
   const handleViewDetails = (track: Track) => {
     setSelectedTrack(track);
     setIsModalOpen(true);
-    // setShowLyrics(false); // Will be restored when audio player is implemented
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedTrack(null);
+    // Reset all temporary states
+    setIsApproving(false);
     setIsRejecting(false);
+    setIsSubmittingRejection(false);
+    setApprovalProgress([]);
     setRejectionReason('');
+    // Audio player reset
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
     setIsPlaying(false);
-    
-    // Stop audio if playing
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-    }
-  };
-  
-  // Audio player controls
-  const togglePlayPause = () => {
-    if (!audioElement) return;
-    
-    if (isPlaying) {
-      audioElement.pause();
-    } else {
-      audioElement.play();
-    }
-    
-    setIsPlaying(!isPlaying);
-  };
-  
-  // Initialize audio element when track is selected
-  useEffect(() => {
-    if (selectedTrack && isModalOpen) {
-      // In a real app, this would use the actual audio file URL
-      const audio = new Audio(`/audio/${selectedTrack.audioFileName}`);
-      
-      audio.addEventListener('ended', () => {
-        setIsPlaying(false);
-      });
-      
-      setAudioElement(audio);
-      
-      return () => {
-        audio.pause();
-        audio.currentTime = 0;
-        audio.removeEventListener('ended', () => {
-          setIsPlaying(false);
-        });
-      };
-    }
-  }, [selectedTrack, isModalOpen]);
-  
-  const toggleLyrics = () => {
-    setShowLyrics(!showLyrics);
   };
 
-  // Handle approve track
   const handleApprove = async () => {
     if (!selectedTrack) return;
-    
-    // Check if track is already in a final state
-    if (selectedTrack.status === 'approved' || selectedTrack.status === 'copyrighted') {
-      alert(`This track is already in '${selectedTrack.status}' status and cannot be approved again.`);
-      return;
-    }
-    
-    // Debug payment verification
-    const isVerified = isPaymentVerified(selectedTrack.id, 'track');
-    const isPending = isPendingVerification(selectedTrack.id, 'track');
-    const allPaymentRecords = JSON.parse(localStorage.getItem('paymentRecords') || '[]');
-    
-    console.log('Payment verification debug:', {
-      trackId: selectedTrack.id,
-      trackStatus: selectedTrack.status,
-      isVerified,
-      isPending,
-      allPaymentRecords
-    });
-    
-    // Check if payment has been verified
-    if (!isPaymentVerified(selectedTrack.id, 'track')) {
-      // Check if the track has payment data from the API
-      if (selectedTrack.paymentStatus === 'approved') {
-        console.log('Track has approved payment in API but not in local storage. Adding to local storage...');
-        // Add the payment record to localStorage
-        const newPaymentRecord = {
-          entityId: selectedTrack.id,
-          entityType: 'track' as const,
-          isPaid: true,
-          verificationStatus: 'verified' as const,
-          amount: 100 // Default amount
-        };
-        allPaymentRecords.push(newPaymentRecord);
-        localStorage.setItem('paymentRecords', JSON.stringify(allPaymentRecords));
-        // Continue with approval
-      } else {
-        alert('This track cannot be approved until payment has been verified by the Financial Administrator.');
-        return;
-      }
-    }
-    
-    setIsProcessing(true);
-    
+
+    setIsApproving(true);
+    setApprovalProgress([]); // Clear previous progress
+
     try {
-      // Make real API call to approve the track
-      await apiService.approveTrack(selectedTrack.id);
-      
-      // Update track status in local state
-      const updatedTracks = tracks.map(track => {
-        if (track.id === selectedTrack.id) {
-          return {
-            ...track,
-            status: 'approved' as const
-          };
-        }
-        return track;
-      });
-      
-      setTracks(updatedTracks);
-      setIsModalOpen(false);
-      setSelectedTrack(null);
+      const response = await apiService.approveTrack(selectedTrack.id);
+      setApprovalProgress(response.progress);
+
+      // Update track status locally on success
+      setTracks(prevTracks =>
+        prevTracks.map(track =>
+          track.id === selectedTrack.id
+            ? { ...track, status: 'approved', fingerprint: response.track.fingerprint }
+            : track
+        )
+      );
     } catch (error: any) {
-      console.error('Error approving track:', error);
-      
-      // Display more detailed error message
-      let errorMessage = 'Failed to approve track. Please try again.';
-      if (error.response && error.response.data && error.response.data.error) {
-        errorMessage = `Error: ${error.response.data.error}`;
-      }
-      
-      alert(errorMessage);
+      console.error('Failed to approve track:', error);
+      const progress = error.response?.data?.progress || [];
+      const errorMessage = error.response?.data?.error || 'An unknown error occurred.';
+      setApprovalProgress([...progress, { step: 'error', status: 'error', message: errorMessage }]);
     } finally {
-      setIsProcessing(false);
+      setIsApproving(false);
     }
   };
 
   const handleReject = async () => {
     if (!selectedTrack) return;
-    
-    if (isRejecting) {
-      if (!rejectionReason.trim()) {
-        alert('Please provide a reason for rejection');
-        return;
-      }
-      
-      setIsProcessing(true);
-      
-      try {
-        // Make real API call to reject the track
-        // We should ideally update the API to accept a rejection reason
-        await apiService.rejectTrack(selectedTrack.id);
-        
-        // Update track status locally
-        setTracks(prevTracks => 
-          prevTracks.map(track => 
-            track.id === selectedTrack.id 
-              ? { ...track, status: 'rejected' } 
-              : track
-          )
-        );
-        
-        // Close modal
-        setIsModalOpen(false);
-        setSelectedTrack(null);
-        setIsRejecting(false);
-        setRejectionReason('');
-      } catch (err: any) {
-        console.error('Failed to reject track', err);
-        
-        // Display more detailed error message
-        let errorMessage = 'Failed to reject track. Please try again.';
-        if (err.response && err.response.data && err.response.data.error) {
-          errorMessage = `Error: ${err.response.data.error}`;
-        }
-        
-        alert(errorMessage);
-      } finally {
-        setIsProcessing(false);
-      }
-    } else {
+
+    // First click: show the rejection reason input
+    if (!isRejecting) {
       setIsRejecting(true);
+      return;
+    }
+
+    // Second click (Confirm Rejection): validate and submit
+    if (!rejectionReason.trim()) {
+      alert('Please provide a reason for rejection.');
+      return;
+    }
+
+    setIsSubmittingRejection(true);
+    try {
+      await apiService.rejectTrack(selectedTrack.id);
+      
+      // Update track status in the UI
+      setTracks(prevTracks =>
+        prevTracks.map(track =>
+          track.id === selectedTrack.id ? { ...track, status: 'rejected' } : track
+        )
+      );
+      
+      // Close the modal on success
+      handleCloseModal();
+    } catch (err) {
+      console.error('Failed to reject track:', err);
+      alert('An error occurred while rejecting the track. Please try again.');
+    } finally {
+      setIsSubmittingRejection(false);
     }
   };
 
   const handleSetCopyrightStatus = async () => {
     if (!selectedTrack) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Update track status locally
-      setTracks(prevTracks => 
-        prevTracks.map(track => 
-          track.id === selectedTrack.id 
-            ? { ...track, status: 'copyrighted' } 
-            : track
-        )
-      );
-      
-      // Close modal
-      setIsModalOpen(false);
-      setSelectedTrack(null);
-    } catch (err) {
-      console.error('Failed to set copyright status', err);
-    } finally {
-      setIsProcessing(false);
+    // Placeholder for future implementation
+    console.log('Setting copyright status for track:', selectedTrack.id);
+    // In a real app, you would call an API here.
+    // For now, just update the status locally.
+    setTracks(prevTracks =>
+      prevTracks.map(track =>
+        track.id === selectedTrack.id ? { ...track, status: 'copyrighted' } : track
+      )
+    );
+    handleCloseModal();
+  };
+
+  const togglePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
     }
   };
 
-  // Commented out until audio player implementation is complete
-  /*
-  const togglePlayPause = () => {
-    setIsPlaying(!isPlaying);
-    // Additional audio player functionality will be added here
-  };
-  */
+  const toggleLyrics = () => setShowLyrics(!showLyrics);
 
   // Filter tracks based on search query and filters
   const filteredTracks = tracks
@@ -369,12 +195,12 @@ const TrackApprovals: React.FC = () => {
       const matchesGenre = genreFilter === 'all' || track.genre === genreFilter;
       const matchesSearch =
         track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        track.artist.name.toLowerCase().includes(searchQuery.toLowerCase());
+        (((track.artist?.firstName && track.artist?.lastName) ? `${track.artist.firstName} ${track.artist.lastName}` : (track.artist?.email ?? 'Unknown Artist'))).toLowerCase().includes(searchQuery.toLowerCase());
       let paymentStatus = track.paymentStatus ? track.paymentStatus.toLowerCase() : 'unknown';
       const matchesPaymentStatus = paymentStatusFilter === 'all' || paymentStatus === paymentStatusFilter;
       return matchesStatus && matchesGenre && matchesSearch && matchesPaymentStatus;
     })
-    .sort((a: Track, b: Track) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    .sort((a: Track, b: Track) => (b.submittedAt ? new Date(b.submittedAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0));
 
   // Get unique genres for filter dropdown
   const genres = Array.from(new Set(tracks.map((track: Track) => track.genre)));
@@ -481,10 +307,7 @@ const TrackApprovals: React.FC = () => {
           {/* Tracks List */}
           {isLoading ? (
             <div className="flex justify-center items-center py-10">
-              <svg className="animate-spin h-8 w-8 text-cosota" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <FiLoader className="animate-spin h-8 w-8 text-cosota" />
             </div>
           ) : filteredTracks.length === 0 ? (
             <div className="text-center py-10">
@@ -511,7 +334,7 @@ const TrackApprovals: React.FC = () => {
                       Genre
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Submitted
+                      Created
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
@@ -539,16 +362,16 @@ const TrackApprovals: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">{track.artist.name}</div>
+                        <div className="text-sm text-gray-900 dark:text-white">{((track.artist?.firstName && track.artist?.lastName) ? `${track.artist.firstName} ${track.artist.lastName}` : (track.artist?.email ?? 'Unknown Artist'))}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500 dark:text-gray-400">{track.genre}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(track.submittedAt)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{track.createdAt ? formatDate(track.createdAt) : 'N/A'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(track.status)}
+                        <span className={getStatusBadge(track.status)}>{track.status}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${track.paymentStatus === 'approved' || track.paymentStatus === 'verified' ? 'bg-green-100 text-green-800' : track.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -605,7 +428,7 @@ const TrackApprovals: React.FC = () => {
                             </button>
                             <div className="ml-3">
                               <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedTrack.title}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{selectedTrack.artist.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{((selectedTrack.artist?.firstName && selectedTrack.artist?.lastName) ? `${selectedTrack.artist.firstName} ${selectedTrack.artist.lastName}` : (selectedTrack.artist?.email ?? 'Unknown Artist'))}</p>
                             </div>
                           </div>
                           <button 
@@ -625,6 +448,14 @@ const TrackApprovals: React.FC = () => {
                             )}
                           </button>
                         </div>
+                        <audio
+                          ref={audioRef}
+                          src={apiService.getTrackAudioUrl(selectedTrack.filename)}
+                          className="w-full mt-2 hidden"
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
+                          onEnded={() => setIsPlaying(false)}
+                        />
                       </div>
                       
                       {/* Lyrics Display */}
@@ -652,7 +483,7 @@ const TrackApprovals: React.FC = () => {
                         
                         <div>
                           <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Artist</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.artist.name}</p>
+                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{((selectedTrack.artist?.firstName && selectedTrack.artist?.lastName) ? `${selectedTrack.artist.firstName} ${selectedTrack.artist.lastName}` : (selectedTrack.artist?.email ?? 'Unknown Artist'))}</p>
                         </div>
                         
                         <div>
@@ -667,12 +498,12 @@ const TrackApprovals: React.FC = () => {
                         
                         <div>
                           <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h4>
-                          <div className="mt-1">{getStatusBadge(selectedTrack.status)}</div>
+                          <div className="mt-1"><span className={getStatusBadge(selectedTrack.status)}>{selectedTrack.status}</span></div>
                         </div>
                         
                         <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Submitted</h4>
-                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(selectedTrack.submittedAt)}</p>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</h4>
+                          <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedTrack.createdAt ? formatDate(selectedTrack.createdAt) : 'N/A'}</p>
                         </div>
                       </div>
                       
@@ -680,6 +511,39 @@ const TrackApprovals: React.FC = () => {
                         <div>
                           <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h4>
                           <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{selectedTrack.description}</p>
+                        </div>
+                      )}
+
+                      {/* Approval Progress Tracker */}
+                      {approvalProgress.length > 0 && (
+                        <div className="w-full text-left">
+                          <div className="bg-gray-100 dark:bg-gray-900 rounded-lg shadow p-4 w-full">
+                            <h3 className="text-base font-semibold mb-3 text-gray-800 dark:text-gray-200">Approval Progress</h3>
+                            <ul className="space-y-2">
+                              {approvalProgress.map((step, idx) => (
+                                <li key={step.step + idx} className="flex items-start">
+                                  <span className={`mr-3 mt-1`}>
+                                    {step.status === 'success' ? <FiCheckCircle className="text-green-500" /> : step.status === 'error' ? <FiXCircle className="text-red-500" /> : <FiLoader className="animate-spin text-gray-500" />}
+                                  </span>
+                                  <div className="flex-grow">
+                                    <div className="font-medium text-sm text-gray-800 dark:text-gray-200">{step.message}</div>
+                                    {step.data && Array.isArray(step.data) && (
+                                      <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 border-l-2 border-red-300 dark:border-red-700 pl-2 ml-1">
+                                        <div className="font-semibold mb-1">Found {step.data.length} similar track(s):</div>
+                                        <ul className="list-disc list-inside space-y-1">
+                                          {step.data.map((item: any, i: number) => (
+                                            <li key={i}>
+                                              {item.title} - <span className="font-semibold">{(item.similarity * 100).toFixed(1)}% similar</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         </div>
                       )}
                       
@@ -704,21 +568,18 @@ const TrackApprovals: React.FC = () => {
                 {selectedTrack.status === 'pending' ? (
                   <>
                     {!isRejecting ? (
-                      <>
+                      <> 
                         {(selectedTrack.paymentStatus === 'approved' || selectedTrack.paymentStatus === 'verified') ? (
                           <>
-                            <button
+                             <button
                               type="button"
                               onClick={handleApprove}
-                              disabled={isProcessing}
-                              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+                              disabled={isApproving}
+                              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
                             >
-                              {isProcessing ? (
+                              {isApproving ? (
                                 <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
+                                  <FiLoader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
                                   Processing...
                                 </>
                               ) : 'Approve'}
@@ -726,18 +587,10 @@ const TrackApprovals: React.FC = () => {
                             <button
                               type="button"
                               onClick={handleReject}
-                              disabled={isProcessing}
+                              disabled={isApproving}
                               className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                             >
-                              {isProcessing ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Processing...
-                                </>
-                              ) : 'Reject'}
+                              Reject
                             </button>
                           </>
                         ) : (
@@ -756,16 +609,21 @@ const TrackApprovals: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleReject}
-                          disabled={isProcessing}
-                          className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                          disabled={isSubmittingRejection}
+                          className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
                         >
-                          Confirm Rejection
+                          {isSubmittingRejection ? (
+                            <>
+                              <FiLoader className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
+                              Submitting...
+                            </>
+                          ) : 'Confirm Rejection'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setIsRejecting(false)}
-                          disabled={isProcessing}
-                          className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
+                          disabled={isSubmittingRejection}
+                          className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
                         >
                           Cancel
                         </button>
@@ -776,7 +634,7 @@ const TrackApprovals: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleSetCopyrightStatus}
-                    disabled={isProcessing}
+                    disabled={isApproving}
                     className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Set as Copyrighted
@@ -786,8 +644,8 @@ const TrackApprovals: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  disabled={isProcessing}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota sm:mt-0 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
+                  disabled={isApproving || isSubmittingRejection}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota sm:mt-0 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   Close
                 </button>

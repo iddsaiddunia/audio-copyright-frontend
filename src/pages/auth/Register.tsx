@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FiUserPlus, FiAlertCircle, FiCheck, FiInfo } from 'react-icons/fi';
 import { ApiService } from '../../services/apiService';
 
+type Role = 'artist' | 'licensee';
 interface FormData {
   firstName: string;
   lastName: string;
@@ -13,6 +14,9 @@ interface FormData {
   phoneNumber: string;
   idNumber: string;
   acceptTerms: boolean;
+  role: Role;
+  verificationDocumentType?: 'passport' | 'national_id' | 'driving_license';
+  file?: File;
 }
 
 const Register: React.FC = () => {
@@ -24,7 +28,8 @@ const Register: React.FC = () => {
     confirmPassword: '',
     phoneNumber: '',
     idNumber: '',
-    acceptTerms: false
+    acceptTerms: false,
+    role: 'artist',
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +43,15 @@ const Register: React.FC = () => {
       ...formData,
       [name]: type === 'checkbox' ? checked : value
     });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData({ ...formData, file: e.target.files[0] });
+    }
+  };
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFormData({ ...formData, role: e.target.value as Role });
   };
 
   const validateStep1 = () => {
@@ -55,6 +69,10 @@ const Register: React.FC = () => {
     if (!formData.phoneNumber.trim()) return 'Phone number is required';
     if (!formData.idNumber.trim()) return 'National ID number is required';
     if (!formData.acceptTerms) return 'You must accept the terms and conditions';
+    if (formData.role === 'artist') {
+      if (!formData.verificationDocumentType) return 'Verification document type is required for artists';
+      if (!formData.file) return 'Verification document file is required for artists';
+    }
     return null;
   };
 
@@ -75,24 +93,21 @@ const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     const error = validateStep2();
     if (error) {
       setError(error);
       return;
     }
-    
     setIsLoading(true);
     setError(null);
-    
     try {
-      // Instantiate ApiService (no token needed for registration)
       const api = new ApiService({ getToken: () => null });
-      await api.register(formData);
-      // Navigate to a success page or login page
+      const submitData = { ...formData };
+      delete submitData.file;
+      await api.registerUser(submitData, formData.file);
       navigate('/auth/registration-submitted');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'An error occurred during registration. Please try again.');
+      setError(err?.response?.data?.error || 'An error occurred during registration. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -284,6 +299,59 @@ const Register: React.FC = () => {
                 className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
             </div>
+
+            <div className="mb-4">
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Registering as
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleRoleChange}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option value="artist">Artist</option>
+                <option value="licensee">Normal User</option>
+              </select>
+            </div>
+
+            {formData.role === 'artist' && (
+              <>
+                <div className="mb-4">
+                  <label htmlFor="verificationDocumentType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Verification Document Type
+                  </label>
+                  <select
+                    id="verificationDocumentType"
+                    name="verificationDocumentType"
+                    value={formData.verificationDocumentType || ''}
+                    onChange={e => setFormData({ ...formData, verificationDocumentType: e.target.value as any })}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required
+                  >
+                    <option value="">Select document type</option>
+                    <option value="passport">Passport</option>
+                    <option value="national_id">National ID</option>
+                    <option value="driving_license">Driving License</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label htmlFor="file" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Upload Verification Document
+                  </label>
+                  <input
+                    id="file"
+                    name="file"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    required={formData.role === 'artist'}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-4">
               <div className="flex">

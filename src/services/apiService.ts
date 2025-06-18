@@ -12,6 +12,17 @@ function getAuthHeaders(token: string | null) {
 }
 
 export class ApiService {
+  /**
+   * Get the full URL for a track's audio file.
+   * @param filename The filename of the audio file (e.g. aad7c350-f104-4f83-bcf8-144155a3197f.mp3)
+   * @returns The full URL to access the audio file
+   */
+  getTrackAudioUrl(filename: string): string {
+    // Remove trailing /api if present in API_BASE_URL
+    const base = API_BASE_URL.replace(/\/api$/, '');
+    return `${base}/audio/${filename}`;
+  }
+
   private axios: AxiosInstance;
   private getToken: () => string | null;
 
@@ -64,9 +75,7 @@ export class ApiService {
   }
 
   // Track endpoints
-  uploadTrack(audio: File) {
-    const formData = new FormData();
-    formData.append('audio', audio);
+  uploadTrack(formData: FormData) {
     return this.request<any>({
       url: '/tracks/upload',
       method: 'POST',
@@ -261,6 +270,11 @@ export class ApiService {
     return this.request<any[]>({ url: '/artists/', method: 'GET' });
   }
 
+  // Verify or approve artist (calls backend /users/:id/verify)
+  verifyArtist(id: string) {
+    return this.request<any>({ url: `/users/${id}/verify`, method: 'PUT' });
+  }
+
   approveArtist(id: string) {
     return this.request<any>({ url: `/artists/${id}/approve`, method: 'POST' });
   }
@@ -290,9 +304,7 @@ export class ApiService {
     return this.request<any>({ url: `/users/${id}/status`, method: 'PUT', data });
   }
 
-  verifyArtist(id: string) {
-    return this.request<any>({ url: `/users/${id}/verify`, method: 'PUT' });
-  }
+ 
 
   deleteUser(id: string) {
     return this.request<any>({ url: `/users/${id}`, method: 'DELETE' });
@@ -315,6 +327,23 @@ export class ApiService {
   // Fetch public dashboard data (no auth)
   getPublicDashboard() {
     return axios.get(`${API_BASE_URL}/dashboard`).then(r => r.data);
+  }
+
+  // Updated register for artist/licensee with file upload
+  async registerUser(data: Record<string, any>, file?: File) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, value as string);
+      }
+    });
+    if (file) {
+      formData.append('file', file);
+    }
+    const response = await this.axios.post('/auth/register', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
   }
 }
 

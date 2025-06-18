@@ -97,7 +97,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const possibleTypes = ['content', 'financial', 'technical', 'super'];
         adminType = data.user.roles.find((r: string) => possibleTypes.includes(r));
       }
-      const user = { ...data.user, id: decoded.id, role, adminType };
+      let user = { ...data.user, id: decoded.id, role, adminType };
+      try {
+        // Fetch full user profile from /users/me to get isVerified and status
+        const apiWithToken = new (await import('../services/apiService')).ApiService({ getToken: () => data.token });
+        const profile = await apiWithToken.getCurrentUser();
+        user = { ...user, ...profile };
+      } catch (profileErr) {
+        console.warn('[AuthContext] Could not fetch /users/me after login:', profileErr);
+      }
       // Store user object for UI (no roles array, only role/adminType)
       localStorage.setItem('cosotaUser', JSON.stringify(user));
       // Optionally store user_role for legacy code

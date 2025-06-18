@@ -74,4 +74,7 @@ export interface User {
   email: string;
   role: UserRole;
   adminType?: AdminType;
+  // Add artist verification fields
+  isVerified?: boolean;
+  status?: string;
 }

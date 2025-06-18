@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHome, FiCheckCircle, FiSearch, FiInfo, FiX, FiMoon, FiSun, FiUser, FiUpload, FiList, FiDollarSign, FiLogOut } from 'react-icons/fi';
+import { FiHome, FiCheckCircle, FiSearch, FiInfo, FiX, FiMoon, FiSun, FiUser, FiUpload, FiList, FiDollarSign, FiLogOut, FiArrowLeft } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
 
 interface MainLayoutProps {
@@ -32,7 +32,29 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
       navigate('/auth/login', { replace: true });
       return;
     }
-    if (requireAuth === 'artist' && currentUser.role !== 'artist') {
+    if (requireAuth === 'artist' && currentUser.role === 'artist') {
+      // If artist is not verified or status is not approved, redirect to profile
+      if (!currentUser.isVerified || currentUser.status !== 'active') {
+        if (location.pathname !== '/artist/profile') {
+          navigate('/artist/profile', { replace: true });
+          return;
+        }
+      }
+    }
+    // Allow licensee to access only specific artist pages
+    if (requireAuth === 'artist' && currentUser.role === 'licensee') {
+      const allowedLicenseePaths = [
+        '/artist/request-license',
+        '/artist/my-licenses',
+        '/artist/transfers',
+        '/artist/profile'
+      ];
+      if (!allowedLicenseePaths.includes(location.pathname)) {
+        navigate('/artist/profile', { replace: true });
+        return;
+      }
+    }
+    if (requireAuth === 'artist' && !['artist', 'licensee'].includes(currentUser.role)) {
       navigate('/auth/login', { replace: true });
       return;
     }
@@ -45,7 +67,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
       navigate('/auth/login', { replace: true });
       return;
     }
-  }, [requireAuth, currentUser, isLoading, navigate]);
+  }, [requireAuth, currentUser, isLoading, navigate, location.pathname, adminType]);
   
   // Define navigation items based on the current context
   const getNavItems = () => {
@@ -59,6 +81,17 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
       ];
     }
 
+    // Fix: Prevent null access
+    if (!currentUser) return [];
+
+    if (requireAuth === 'artist' && currentUser.role === 'licensee') {
+      return [
+        { path: '/artist/request-license', label: 'Request License', icon: <FiCheckCircle className="w-5 h-5" /> },
+        { path: '/artist/my-licenses', label: 'My Licenses', icon: <FiList className="w-5 h-5" /> },
+        { path: '/artist/transfers', label: 'Transfers', icon: <FiArrowLeft className="w-5 h-5" /> },
+        { path: '/artist/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
+      ];
+    }
     if (requireAuth === 'artist') {
       return [
         { path: '/artist', label: 'Dashboard', icon: <FiHome className="w-5 h-5" /> },
@@ -67,6 +100,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
         { path: '/artist/track-payments', label: 'Track Payments', icon: <FiDollarSign className="w-5 h-5" /> },
         { path: '/artist/request-license', label: 'Request License', icon: <FiCheckCircle className="w-5 h-5" /> },
         { path: '/artist/my-licenses', label: 'My Licenses', icon: <FiList className="w-5 h-5" /> },
+        { path: '/artist/transfers', label: 'Transfers', icon: <FiArrowLeft className="w-5 h-5" /> },
         { path: '/artist/license-settings', label: 'License Settings', icon: <FiDollarSign className="w-5 h-5" /> },
         { path: '/artist/profile', label: 'My Profile', icon: <FiUser className="w-5 h-5" /> },
       ];
@@ -199,7 +233,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
                   <div className="pt-5 pb-4">
                     <div className="flex items-center justify-between px-4">
                       <div className="text-xl font-bold text-cosota dark:text-cosota-light">
-                        COSOTA
+                        {/* COSOTA */}
                       </div>
                       <button
                         onClick={toggleSidebar}
@@ -256,7 +290,7 @@ const MainLayout = ({ requireAuth }: MainLayoutProps = {}) => {
                 <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
                   <div className="flex items-center justify-center flex-shrink-0 px-4">
                     <h1 className="text-xl font-bold text-cosota dark:text-cosota-light">
-                      COSOTA
+                      {/* COSOTA */}
                     </h1>
                   </div>
                   <nav className="mt-8 flex-1 px-4 space-y-2">

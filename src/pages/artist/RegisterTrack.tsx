@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ApiService } from '../../services/apiService';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -33,7 +34,7 @@ const RegisterTrack: React.FC = () => {
     lyrics: '',
     collaborators: '',
     isAvailableForLicensing: true,
-    licenseFee: 25000, // Default license fee in TZS
+    licenseFee: 0, // Default license fee in TZS
     licenseTerms: 'Commercial use requires prior approval',
     audioFile: null,
     audioFileName: ''
@@ -115,7 +116,7 @@ const RegisterTrack: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
+  
       const formPayload = new FormData();
       formPayload.append('title', formData.title);
       formPayload.append('genre', formData.genre);
@@ -128,21 +129,15 @@ const RegisterTrack: React.FC = () => {
       formPayload.append('licenseTerms', formData.licenseTerms);
       formPayload.append('audio', formData.audioFile);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'}/tracks/upload`,
-        {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          body: formPayload,
-        }
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setError(data.error || 'Track upload failed.');
+      const apiService = new ApiService({ getToken: () => localStorage.getItem('token') });
+      try {
+        await apiService.uploadTrack(formPayload);
+        navigate('/artist/track-submitted');
+      } catch (err: any) {
+        setError(err?.response?.data?.error || 'Track upload failed.');
         setIsLoading(false);
         return;
       }
-      navigate('/artist/track-submitted');
     } catch (err: any) {
       if (err?.response?.data?.error) {
         setError(err.response.data.error);
@@ -500,7 +495,7 @@ const RegisterTrack: React.FC = () => {
               <h4 className="text-base font-medium text-gray-900 dark:text-white">Registration Fee</h4>
               <p className="text-sm text-gray-500 dark:text-gray-400">Non-refundable fee for copyright registration</p>
             </div>
-            <span className="text-xl font-bold text-gray-900 dark:text-white">TZS 25,000</span>
+            <span className="text-xl font-bold text-gray-900 dark:text-white">TZS {formData.licenseFee}</span>
           </div>
         </div>
 

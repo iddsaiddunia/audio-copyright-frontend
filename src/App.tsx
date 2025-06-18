@@ -86,7 +86,7 @@ function App() {
           </Route>
 
           {/* Artist Routes */}
-          <Route path="/artist" element={<ProtectedRoute requiredRole="artist" />}> 
+          <Route path="/artist" element={<ProtectedRoute requiredRole={["artist", "licensee"]} />}> 
             <Route element={<MainLayout requireAuth="artist" />}>
               <Route index element={<ArtistDashboard />} />
               <Route path="register-track" element={<RegisterTrack />} />

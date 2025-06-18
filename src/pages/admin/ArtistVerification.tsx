@@ -32,6 +32,8 @@ interface ArtistApplication {
     fileName: string;
     url: string;
   }[];
+  verificationDocumentType?: 'passport' | 'national_id' | 'driving_license';
+  verificationDocumentUrl?: string | null;
 }
 
 const ArtistVerification: React.FC = () => {
@@ -55,6 +57,8 @@ const ArtistVerification: React.FC = () => {
         const mapped = response.map((artist: any) => ({
           ...artist,
           status: artist.isVerified ? 'approved' : 'pending',
+          verificationDocumentType: artist.verificationDocumentType,
+          verificationDocumentUrl: artist.verificationDocumentUrl,
         }));
         setApplications(mapped);
       } catch (err) {
@@ -112,8 +116,8 @@ const ArtistVerification: React.FC = () => {
     setIsProcessing(true);
     
     try {
-      // Call the real API to approve the artist
-      await apiService.approveArtist(selectedApplication.id);
+      // Call the real API to verify the artist
+      await apiService.verifyArtist(selectedApplication.id);
 
       // Update the application status in our local state
       setApplications(prevApplications => 
@@ -400,37 +404,59 @@ const ArtistVerification: React.FC = () => {
                       <div>
                         <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Documents</h4>
                         <div className="mt-2 space-y-2">
-                          {selectedApplication.documents && selectedApplication.documents.length > 0 ? (
-                            selectedApplication.documents.map((doc, index) => (
-                              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
-                                <div className="flex items-center">
-                                  <FiFileText className="h-5 w-5 text-gray-400 mr-2" />
-                                  <span className="text-sm text-gray-900 dark:text-white">
-                                    {doc.type === 'id' && 'National ID'}
-                                    {doc.type === 'photo' && 'Profile Photo'}
-                                    {doc.type === 'proof_address' && 'Proof of Address'}
-                                  </span>
-                                </div>
-                                <div className="flex space-x-2">
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota"
-                                  >
-                                    <FiEye className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                                  >
-                                    <FiDownload className="h-4 w-4" />
-                                  </button>
-                                </div>
+                          {selectedApplication.verificationDocumentType && selectedApplication.verificationDocumentUrl ? (
+                            <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
+                              <div className="flex items-center">
+                                <FiFileText className="h-5 w-5 text-gray-400 mr-2" />
+                                <span className="text-sm text-gray-900 dark:text-white">
+                                  {selectedApplication.verificationDocumentType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
                               </div>
-                            ))
-                          ) : (
-                            <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-500 dark:text-gray-400">
-                              No documents available
+                              <div className="flex space-x-2">
+                                <a
+                                  href={selectedApplication.verificationDocumentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota"
+                                  title="View Document"
+                                >
+                                  <FiEye className="h-4 w-4" />
+                                </a>
+                              </div>
                             </div>
+                          ) : (
+                            selectedApplication.documents && selectedApplication.documents.length > 0 ? (
+                              selectedApplication.documents.map((doc, index) => (
+                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
+                                  <div className="flex items-center">
+                                    <FiFileText className="h-5 w-5 text-gray-400 mr-2" />
+                                    <span className="text-sm text-gray-900 dark:text-white">
+                                      {doc.type === 'id' && 'National ID'}
+                                      {doc.type === 'photo' && 'Profile Photo'}
+                                      {doc.type === 'proof_address' && 'Proof of Address'}
+                                    </span>
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota"
+                                    >
+                                      <FiEye className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                    >
+                                      <FiDownload className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-500 dark:text-gray-400">
+                                No documents available
+                              </div>
+                            )
                           )}
                         </div>
                       </div>

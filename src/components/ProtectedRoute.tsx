@@ -1,9 +1,9 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import type { UserRole } from '../types/auth';
+
 
 interface ProtectedRouteProps {
-  requiredRole?: UserRole;
+  requiredRole: string | string[];
   requiredPermission?: string;
 }
 
@@ -27,8 +27,9 @@ function ProtectedRoute({ requiredRole, requiredPermission }: ProtectedRouteProp
     );
   }
   
-  // Check if user is authenticated
-  if (!currentUser) {
+  // Allow requiredRole to be string or array
+  const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+  if (!currentUser || !allowedRoles.includes(currentUser.role)) {
     return <Navigate to="/auth/login" replace />;
   }
   
@@ -41,7 +42,6 @@ function ProtectedRoute({ requiredRole, requiredPermission }: ProtectedRouteProp
     requiredRole,
     requiredPermission,
     isAdmin: isAdmin(),
-    hasRequiredRole: requiredRole ? hasRole(requiredRole) : 'not required'
   });
 
   // Special handling for admin routes
@@ -51,10 +51,12 @@ function ProtectedRoute({ requiredRole, requiredPermission }: ProtectedRouteProp
       console.debug('[ProtectedRoute] Redirecting to 404: Not an admin');
       return <Navigate to="/404" replace />;
     }
-  } else if (requiredRole && !hasRole(requiredRole)) {
-    // For non-admin routes with a required role
-    console.debug('[ProtectedRoute] Redirecting to 404: Missing required role', requiredRole);
-    return <Navigate to="/404" replace />;
+  } else if (requiredRole) {
+    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!allowedRoles.some(hasRole)) {
+      console.debug('[ProtectedRoute] Redirecting to 404: Missing required role', requiredRole);
+      return <Navigate to="/404" replace />;
+    }
   }
   
   // Check for required permission if specified
