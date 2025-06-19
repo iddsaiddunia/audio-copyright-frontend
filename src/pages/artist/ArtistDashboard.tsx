@@ -17,7 +17,7 @@ interface Track {
   id: string;
   title: string;
   status: 'pending' | 'approved' | 'rejected' | 'copyrighted';
-  submittedAt: string;
+  createdAt: string;
   genre: string;
 }
 
@@ -28,7 +28,7 @@ interface License {
   licenseeId: string;
   licenseeName: string;
   status: 'pending' | 'approved' | 'rejected';
-  requestedAt: string;
+  createdAt: string;
 }
 
 interface Transfer {
@@ -38,7 +38,7 @@ interface Transfer {
   transferType: 'incoming' | 'outgoing';
   counterpartyName: string;
   status: 'pending' | 'completed' | 'rejected';
-  requestedAt: string;
+  createdAt: string;
 }
 
 const ArtistDashboard: React.FC = () => {
@@ -48,81 +48,32 @@ const ArtistDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the artist's data
-    // For demo purposes, we'll use mock data
+    // Fetch artist dashboard data from the API
     const fetchData = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setTracks([
-        {
-          id: '1',
-          title: 'Serengeti Sunset',
-          status: 'approved',
-          submittedAt: '2025-05-15T10:30:00Z',
-          genre: 'Bongo Flava'
-        },
-        {
-          id: '2',
-          title: 'Zanzibar Nights',
-          status: 'copyrighted',
-          submittedAt: '2025-05-10T14:20:00Z',
-          genre: 'Afrobeat'
-        },
-        {
-          id: '3',
-          title: 'Kilimanjaro Dreams',
-          status: 'pending',
-          submittedAt: '2025-05-20T09:15:00Z',
-          genre: 'Taarab'
-        }
-      ]);
-      
-      setLicenses([
-        {
-          id: '1',
-          trackId: '1',
-          trackTitle: 'Serengeti Sunset',
-          licenseeId: '2',
-          licenseeName: 'Jane Doe',
-          status: 'pending',
-          requestedAt: '2025-05-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          trackId: '2',
-          trackTitle: 'Zanzibar Nights',
-          licenseeId: '3',
-          licenseeName: 'Robert Mbuki',
-          status: 'approved',
-          requestedAt: '2025-05-18T11:45:00Z'
-        }
-      ]);
-      
-      // Mock transfer data
-      setTransfers([
-        {
-          id: '1',
-          trackId: '2',
-          trackTitle: 'Zanzibar Nights',
-          transferType: 'outgoing',
-          counterpartyName: 'Jane Doe',
-          status: 'completed',
-          requestedAt: '2025-05-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          trackId: '5',
-          trackTitle: 'Dar es Salaam Groove',
-          transferType: 'incoming',
-          counterpartyName: 'Robert Mbuki',
-          status: 'pending',
-          requestedAt: '2025-05-10T09:15:00Z'
-        }
-      ]);
-      
+      setIsLoading(true);
+      try {
+        const api = new (await import('../../services/apiService')).ApiService({ getToken: () => localStorage.getItem('token') });
+        // Fetch tracks
+        const tracksRes = await api.getMyTracks();
+        setTracks(tracksRes || []);
+        // Fetch licenses (as owner)
+        const licensesRes = await api.getUserLicenses('owner');
+        setLicenses(licensesRes || []);
+        // Fetch transfers (both incoming and outgoing, then combine)
+        const [outgoing, incoming] = await Promise.all([
+          api.getMyOutgoingTransfers(),
+          api.getMyIncomingTransfers()
+        ]);
+        // Mark transferType for clarity
+        const outgoingMarked = (outgoing || []).map(t => ({ ...t, transferType: 'outgoing' }));
+        const incomingMarked = (incoming || []).map(t => ({ ...t, transferType: 'incoming' }));
+        setTransfers([...outgoingMarked, ...incomingMarked]);
+      } catch (err) {
+        // Optionally handle error
+      }
       setIsLoading(false);
     };
-    
+
     fetchData();
   }, []);
 
@@ -384,15 +335,10 @@ const ArtistDashboard: React.FC = () => {
                         <div className="text-sm text-gray-500 dark:text-gray-400">{transfer.counterpartyName}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(transfer.requestedAt)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(transfer.createdAt)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(transfer.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/artist/transfers/${transfer.id}`} className="text-cosota hover:text-cosota-dark dark:text-cosota-light">
-                          View
-                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -410,12 +356,7 @@ const ArtistDashboard: React.FC = () => {
             <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Your Tracks</h3>
             <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Recent copyright registrations</p>
           </div>
-          <Link 
-            to="/artist/tracks"
-            className="text-sm font-medium text-cosota hover:text-cosota-dark dark:text-cosota-light"
-          >
-            View all
-          </Link>
+          
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700">
           {isLoading ? (
@@ -472,15 +413,10 @@ const ArtistDashboard: React.FC = () => {
                         <div className="text-sm text-gray-500 dark:text-gray-400">{track.genre}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(track.submittedAt)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(track.createdAt)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(track.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/artist/tracks/${track.id}`} className="text-cosota hover:text-cosota-dark dark:text-cosota-light">
-                          View
-                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -498,12 +434,7 @@ const ArtistDashboard: React.FC = () => {
             <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">License Requests</h3>
             <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Recent requests to license your works</p>
           </div>
-          <Link 
-            to="/artist/license-requests"
-            className="text-sm font-medium text-cosota hover:text-cosota-dark dark:text-cosota-light"
-          >
-            View all
-          </Link>
+          
         </div>
         <div className="border-t border-gray-200 dark:border-gray-700">
           {isLoading ? (
@@ -551,16 +482,12 @@ const ArtistDashboard: React.FC = () => {
                         <div className="text-sm text-gray-500 dark:text-gray-400">{license.licenseeName}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(license.requestedAt)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(license.createdAt)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(license.status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/artist/license-requests/${license.id}`} className="text-cosota hover:text-cosota-dark dark:text-cosota-light">
-                          View
-                        </Link>
-                      </td>
+                      
                     </tr>
                   ))}
                 </tbody>

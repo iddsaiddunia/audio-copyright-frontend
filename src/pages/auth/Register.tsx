@@ -37,12 +37,57 @@ const Register: React.FC = () => {
   const [step, setStep] = useState<1 | 2>(1);
   const navigate = useNavigate();
 
+  const [passwordValidation, setPasswordValidation] = useState({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false,
+  });
+
+  const PasswordRequirement: React.FC<{ met: boolean; text: string }> = ({ met, text }) => (
+    <li className={`flex items-center transition-colors duration-200 ${met ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+      <svg className={`mr-2 h-4 w-4 transition-opacity duration-200 ${met ? 'opacity-100' : 'opacity-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+      <span>{text}</span>
+    </li>
+  );
+
+  const validatePassword = (password: string) => {
+    const validations = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      special: /[@$!%*?&]/.test(password),
+    };
+    setPasswordValidation(validations);
+    return Object.values(validations).every(Boolean);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    });
+
+    if (name === 'idNumber') {
+      const digits = value.replace(/\D/g, '').substring(0, 21); // 4+14+3 = 21 digits max
+      let formatted = '';
+      if (digits.length > 18) {
+        formatted = `${digits.substring(0, 4)}-${digits.substring(4, 18)}-${digits.substring(18)}`;
+      } else if (digits.length > 4) {
+        formatted = `${digits.substring(0, 4)}-${digits.substring(4)}`;
+      } else {
+        formatted = digits;
+      }
+      setFormData({ ...formData, idNumber: formatted });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: type === 'checkbox' ? checked : value
+      });
+    }
+
+    if (name === 'password') {
+      validatePassword(value);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,19 +105,29 @@ const Register: React.FC = () => {
     if (!formData.email.trim()) return 'Email is required';
     if (!/^\S+@\S+\.\S+$/.test(formData.email)) return 'Please enter a valid email address';
     if (!formData.password) return 'Password is required';
-    if (formData.password.length < 8) return 'Password must be at least 8 characters long';
+    if (!validatePassword(formData.password)) return 'Password does not meet all the requirements.';
     if (formData.password !== formData.confirmPassword) return 'Passwords do not match';
     return null;
   };
 
   const validateStep2 = () => {
-    if (!formData.phoneNumber.trim()) return 'Phone number is required';
-    if (!formData.idNumber.trim()) return 'National ID number is required';
+    const phoneRegex = /^\+?\d{10,15}$/;
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      return 'Invalid phone number format. Please include the country code.';
+    }
+
+    const idNumberRegex = /^\d{4}-\d{14}-\d{3}$/;
+    if (!idNumberRegex.test(formData.idNumber)) {
+      return 'Invalid National ID format. Use: YYYY-##############-###';
+    }
+
     if (!formData.acceptTerms) return 'You must accept the terms and conditions';
+
     if (formData.role === 'artist') {
       if (!formData.verificationDocumentType) return 'Verification document type is required for artists';
       if (!formData.file) return 'Verification document file is required for artists';
     }
+
     return null;
   };
 
@@ -223,7 +278,10 @@ const Register: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
                 Password
               </label>
               <input
@@ -234,11 +292,19 @@ const Register: React.FC = () => {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Password must be at least 8 characters long
-              </p>
+              {formData.password && (
+                <div className="mt-2 text-sm">
+                  <ul className="space-y-1">
+                    <PasswordRequirement met={passwordValidation.length} text="At least 8 characters" />
+                    <PasswordRequirement met={passwordValidation.uppercase} text="At least one uppercase letter" />
+                    <PasswordRequirement met={passwordValidation.lowercase} text="At least one lowercase letter" />
+                    <PasswordRequirement met={passwordValidation.number} text="At least one number" />
+                    <PasswordRequirement met={passwordValidation.special} text="At least one special character (@$!%*?&)" />
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div>

@@ -17,7 +17,7 @@ interface Track {
   genre: string;
   releaseYear: string;
   status: 'pending' | 'approved' | 'rejected' | 'copyrighted';
-  submittedAt: string;
+  createdAt: string;
   isAvailableForLicensing: boolean;
   licenseFee?: number;
   licenseTerms?: string;
@@ -124,8 +124,8 @@ const MyTracks: React.FC = () => {
           : b.title.localeCompare(a.title);
       } else {
         return sortDirection === 'asc' 
-          ? new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime() 
-          : new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() 
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
 
@@ -355,7 +355,7 @@ const MyTracks: React.FC = () => {
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           <div className="flex items-center">
                             <FiCalendar className="mr-1 h-4 w-4 text-gray-400" />
-                            {formatDate(track.submittedAt)}
+                            {formatDate(track.createdAt)}
                           </div>
                         </div>
                       </td>

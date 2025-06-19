@@ -3,125 +3,48 @@ import { motion } from 'framer-motion';
 import { 
   FiDollarSign, 
   FiDownload, 
-  FiCalendar,
   FiFilter
 } from 'react-icons/fi';
 
 // Define types for financial data
-interface RevenueData {
+interface MonthlyRevenue {
   month: string;
-  copyrightFees: number;
-  licenseFees: number;
-  transferFees: number;
+  revenue: number;
+}
+
+interface TypeSummary {
+  count: number;
   total: number;
 }
 
-interface TransactionSummary {
-  type: string;
-  count: number;
-  amount: number;
-  percentChange: number;
+interface GlobalFinancialMetrics {
+  totalRevenue: number;
+  monthlyRevenue: MonthlyRevenue[];
+  recentTransactions: any[];
+  typeSummary: Record<string, TypeSummary>;
 }
 
 const FinancialReports = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
-  const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
-  const [transactionSummary, setTransactionSummary] = useState<TransactionSummary[]>([]);
-  // Calculate total revenue from transaction summary
-  const totalRevenue = transactionSummary.reduce((sum, item) => sum + item.amount, 0);
-  
-  // Fetch financial data based on selected time range
+  const [metrics, setMetrics] = useState<GlobalFinancialMetrics | null>(null);
+
   useEffect(() => {
-    const fetchFinancialData = async () => {
+    const fetchMetrics = async () => {
       setIsLoading(true);
-      
       try {
-        // In a real app, this would be an API call to fetch financial data
-        // For demo purposes, we'll use mock data
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Generate mock revenue data
-        const mockRevenueData: RevenueData[] = [
-          { 
-            month: 'Jan', 
-            copyrightFees: 125000, 
-            licenseFees: 75000, 
-            transferFees: 25000, 
-            total: 225000 
-          },
-          { 
-            month: 'Feb', 
-            copyrightFees: 150000, 
-            licenseFees: 85000, 
-            transferFees: 30000, 
-            total: 265000 
-          },
-          { 
-            month: 'Mar', 
-            copyrightFees: 175000, 
-            licenseFees: 95000, 
-            transferFees: 35000, 
-            total: 305000 
-          },
-          { 
-            month: 'Apr', 
-            copyrightFees: 200000, 
-            licenseFees: 110000, 
-            transferFees: 40000, 
-            total: 350000 
-          },
-          { 
-            month: 'May', 
-            copyrightFees: 225000, 
-            licenseFees: 125000, 
-            transferFees: 45000, 
-            total: 395000 
-          },
-          { 
-            month: 'Jun', 
-            copyrightFees: 250000, 
-            licenseFees: 140000, 
-            transferFees: 50000, 
-            total: 440000 
-          }
-        ];
-        
-        // Generate mock transaction summary
-        const mockTransactionSummary: TransactionSummary[] = [
-          { 
-            type: 'Copyright Registrations', 
-            count: 412, 
-            amount: 1125000, 
-            percentChange: 15.3 
-          },
-          { 
-            type: 'License Fees', 
-            count: 287, 
-            amount: 630000, 
-            percentChange: 22.7 
-          },
-          { 
-            type: 'Ownership Transfers', 
-            count: 98, 
-            amount: 225000, 
-            percentChange: 8.5 
-          }
-        ];
-        
-        setRevenueData(mockRevenueData);
-        setTransactionSummary(mockTransactionSummary);
+        const { ApiService } = await import('../../services/apiService');
+        const api = new ApiService({ getToken: () => localStorage.getItem('token') });
+        const data = await api.getGlobalFinancialMetrics();
+        setMetrics(data);
       } catch (error) {
-        console.error('Error fetching financial data:', error);
+        console.error('Error fetching global financial metrics:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    
-    fetchFinancialData();
-  }, [timeRange]);
-  
-  // Format currency values
+    fetchMetrics();
+  }, []);
+
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -130,13 +53,45 @@ const FinancialReports = () => {
       maximumFractionDigits: 0
     }).format(amount);
   };
-  
+
   // Handle export report
   const handleExportReport = () => {
-    // In a real app, this would generate a PDF or CSV report
-    alert('Export functionality would be implemented here');
+    if (!metrics) return;
+    let csv = '';
+    // Total Revenue
+    csv += 'Total Revenue,' + metrics.totalRevenue + '\n';
+    csv += '\n';
+    // Monthly Revenue
+    csv += 'Monthly Revenue\nMonth,Revenue\n';
+    metrics.monthlyRevenue.forEach((m) => {
+      csv += `${m.month},${m.revenue}\n`;
+    });
+    csv += '\n';
+    // Payment Type Summary
+    csv += 'Payment Type Summary\nType,Count,Total\n';
+    Object.entries(metrics.typeSummary).forEach(([type, summary]) => {
+      csv += `${type},${summary.count},${summary.total}\n`;
+    });
+    csv += '\n';
+    // Recent Transactions
+    csv += 'Recent Transactions\nID,Type,Date,Amount,Status\n';
+    metrics.recentTransactions.forEach((tx: any) => {
+      csv += `${tx.id},${tx.paymentType},${tx.paidAt ? new Date(tx.paidAt).toLocaleDateString() : '-'},${tx.amount},${tx.status}\n`;
+    });
+    // Download logic
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const date = new Date().toISOString().slice(0,10);
+    link.download = `financial_report_${date}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
-  
+
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -152,21 +107,6 @@ const FinancialReports = () => {
           </p>
         </div>
         <div className="flex space-x-3">
-          <div className="relative">
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value as any)}
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-cosota focus:border-cosota sm:text-sm rounded-md"
-            >
-              <option value="week">Last Week</option>
-              <option value="month">Last Month</option>
-              <option value="quarter">Last Quarter</option>
-              <option value="year">Last Year</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-              <FiCalendar className="h-4 w-4" />
-            </div>
-          </div>
           <button
             onClick={handleExportReport}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-cosota hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota"
@@ -188,8 +128,8 @@ const FinancialReports = () => {
         <>
           {/* Revenue Summary Cards */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {transactionSummary.map((item, index) => (
-              <div key={index} className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+            {metrics && Object.entries(metrics.typeSummary).map(([type, summary]: [string, TypeSummary]) => (
+              <div key={type} className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-md p-3">
@@ -197,15 +137,14 @@ const FinancialReports = () => {
                     </div>
                     <div className="ml-5 w-0 flex-1">
                       <dl>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{item.type}</dt>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{type.charAt(0).toUpperCase() + type.slice(1)}</dt>
                         <dd>
-                          <div className="text-lg font-medium text-gray-900 dark:text-white">{formatCurrency(item.amount)}</div>
+                          <div className="text-lg font-medium text-gray-900 dark:text-white">{formatCurrency(summary.total)}</div>
                         </dd>
                         <dd className="flex items-center text-sm">
-                          <span className={`mr-1 ${item.percentChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {item.percentChange >= 0 ? '↑' : '↓'} {Math.abs(item.percentChange)}%
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {summary.count} transactions
                           </span>
-                          <span className="text-gray-500 dark:text-gray-400">from previous period</span>
                         </dd>
                       </dl>
                     </div>
@@ -221,22 +160,8 @@ const FinancialReports = () => {
               <div>
                 <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Revenue Breakdown</h3>
                 <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-                  Total revenue: {formatCurrency(totalRevenue)} • Monthly revenue by category
+                  Total revenue: {formatCurrency(metrics?.totalRevenue ?? 0)} • Monthly revenue by category
                 </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center">
-                  <div className="h-3 w-3 bg-purple-500 rounded-full mr-1"></div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Copyright</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="h-3 w-3 bg-blue-500 rounded-full mr-1"></div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">License</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="h-3 w-3 bg-green-500 rounded-full mr-1"></div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Transfer</span>
-                </div>
               </div>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700">
@@ -244,20 +169,12 @@ const FinancialReports = () => {
                 <div className="h-64 relative">
                   {/* This is a placeholder for a chart - in a real app, you would use a chart library */}
                   <div className="absolute inset-0 flex items-end">
-                    {revenueData.map((data, index) => (
+                    {metrics?.monthlyRevenue?.map((data: MonthlyRevenue, index: number) => (
                       <div key={index} className="flex-1 flex flex-col items-center">
                         <div className="w-full flex flex-col-reverse h-48">
                           <div 
                             className="w-full bg-green-500 transition-all duration-500" 
-                            style={{ height: `${(data.transferFees / data.total) * 100}%` }}
-                          ></div>
-                          <div 
-                            className="w-full bg-blue-500 transition-all duration-500" 
-                            style={{ height: `${(data.licenseFees / data.total) * 100}%` }}
-                          ></div>
-                          <div 
-                            className="w-full bg-purple-500 transition-all duration-500" 
-                            style={{ height: `${(data.copyrightFees / data.total) * 100}%` }}
+                            style={{ height: `${(data.revenue / (metrics?.totalRevenue ?? 1)) * 100}%` }}
                           ></div>
                         </div>
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{data.month}</div>
@@ -315,23 +232,23 @@ const FinancialReports = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {[...Array(5)].map((_, index) => (
+                    {metrics?.recentTransactions?.map((tx: any, index: number) => (
                       <tr key={index}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          TX-{Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}
+                          {tx.id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {['Copyright Fee', 'License Fee', 'Transfer Fee'][Math.floor(Math.random() * 3)]}
+                          {tx.paymentType.charAt(0).toUpperCase() + tx.paymentType.slice(1)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(Date.now() - Math.floor(Math.random() * 30) * 86400000).toLocaleDateString()}
+                          {tx.paidAt ? new Date(tx.paidAt).toLocaleDateString() : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          {formatCurrency(Math.floor(Math.random() * 100000) + 5000)}
+                          {formatCurrency(tx.amount)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            Completed
+                            {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                           </span>
                         </td>
                       </tr>

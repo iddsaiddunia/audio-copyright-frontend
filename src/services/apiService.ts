@@ -201,6 +201,11 @@ export class ApiService {
     return this.request<any[]>({ url: '/payments/all', method: 'GET' });
   }
 
+  // Admin: Fetch global financial metrics
+  getGlobalFinancialMetrics() {
+    return this.request<any>({ url: '/payments/metrics/global', method: 'GET' });
+  }
+
   approvePayment(id: string) {
     return this.request<any>({ url: `/payments/${id}/approve`, method: 'POST' });
   }
