@@ -292,6 +292,10 @@ export class ApiService {
     return this.request<any[]>({ url: '/users', method: 'GET' });
   }
 
+  searchUsers(email: string) {
+    return this.request<any[]>({ url: `/users/search?email=${email}`, method: 'GET' });
+  }
+
   createAdminUser(data: any) {
     return this.request<any>({ url: '/users', method: 'POST', data });
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FiExternalLink, FiRefreshCw, FiSearch, FiCheckCircle, FiFilter } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiCheckCircle, FiFilter } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
 import { ApiService } from '../../services/apiService';
 import type { License } from '../../types/license';
@@ -290,147 +290,134 @@ const LicensePublish: React.FC = () => {
       </div>
       {/* Unified Publish Modal (mirrors CopyrightPublishing) */}
       {selectedLicense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-lg">
-            <h2 className="text-lg font-semibold mb-4">License Details & Blockchain Publishing</h2>
-            <div className="mb-2"><b>Track:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.track?.title || selectedLicense.trackId}</span></div>
-            <div className="mb-2"><b>Owner:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.owner ? `${selectedLicense.owner.firstName} ${selectedLicense.owner.lastName}` : selectedLicense.ownerId}</span></div>
-            <div className="mb-2"><b>Licensee:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.requester ? `${selectedLicense.requester.firstName} ${selectedLicense.requester.lastName}` : selectedLicense.requesterId}</span></div>
-            <div className="mb-2"><b>Status:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.status}</span></div>
-            <div className="mb-2"><b>Purpose:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.purpose}</span></div>
-            <div className="mb-2"><b>Duration:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.duration}</span></div>
-            <div className="mb-2"><b>Territory:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.territory}</span></div>
-            <div className="mb-2"><b>Usage Type:</b> <span className="text-gray-900 dark:text-white">{selectedLicense.usageType}</span></div>
-            <div className="mb-2"><b>Payments:</b> {selectedLicense.payments && selectedLicense.payments.length > 0 ? (
-              <ul className="list-disc ml-5">
-                {selectedLicense.payments.map(p => (
-                  <li key={p.id}><span className="text-gray-900 dark:text-white">Amount: {p.amount}, Status: {p.status}, Paid At: {p.paidAt || 'N/A'}</span></li>
-                ))}
-              </ul>
-            ) : <span className="text-gray-900 dark:text-white">No payments found</span>}
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl sm:w-full">
+            <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="sm:flex sm:items-start">
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                    License Details & Publishing
+                  </h3>
+                  <div className="mt-4">
+                    <div className="space-y-6">
+                      {/* Details Section */}
+                      <div className="border-t border-gray-200 dark:border-gray-700">
+                        <dl className="sm:divide-y sm:divide-gray-200 dark:sm:divide-gray-700">
+                          <div className="py-3 sm:py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Track Title</dt>
+                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{selectedLicense.track?.title || selectedLicense.trackId}</dd>
+                          </div>
+                          <div className="py-3 sm:py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Licensee</dt>
+                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{selectedLicense.requester ? `${selectedLicense.requester.firstName} ${selectedLicense.requester.lastName}` : selectedLicense.requesterId}</dd>
+                          </div>
+                          <div className="py-3 sm:py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">License Type</dt>
+                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{selectedLicense.licenseType}</dd>
+                          </div>
+                          <div className="py-3 sm:py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
+                            <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{getStatusBadge(selectedLicense.status)}</dd>
+                          </div>
+                        </dl>
+                      </div>
 
-            {/* Wallet connection and status */}
-            {!wallet?.isConnected ? (
-              <div className="mt-4">
+                      {/* Wallet Connection Info */}
+                      {!wallet?.isConnected ? (
+                        <>
+                          {walletError && 
+                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                              <div className="text-center text-red-600 text-sm mt-2">{walletError}</div>
+                            </div>
+                          }
+                        </>
+                      ) : (
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 flex items-center justify-between">
+                           <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Wallet Connected</span>
+                           <div className="flex items-center bg-green-100 dark:bg-green-900/30 rounded-full px-3 py-1">
+                              <div className="h-2 w-2 rounded-full bg-green-500 mr-2"></div>
+                              <span className="text-xs font-medium text-green-800 dark:text-green-400">
+                                {wallet.address.substring(0, 6)}...{wallet.address.substring(wallet.address.length - 4)}
+                              </span>
+                            </div>
+                        </div>
+                      )}
+
+                      {/* Publishing progress and details */}
+                      {(isPublishing || currentTransaction) && (
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Publishing Status</h4>
+                          <div className="space-y-3">
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-600">
+                              <div className="bg-cosota h-2.5 rounded-full" style={{ width: `${publishingProgress}%`, transition: 'width 0.5s ease-in-out' }}></div>
+                            </div>
+                            <div className="flex justify-between items-center text-xs font-medium text-gray-600 dark:text-gray-300">
+                              <span>{transactionStage.charAt(0).toUpperCase() + transactionStage.slice(1)}</span>
+                              {transactionStage === 'pending' && <span className="text-yellow-500">In Progress...</span>}
+                              {transactionStage === 'confirmed' && <span className="text-green-500">Confirmed</span>}
+                              {transactionStage === 'failed' && <span className="text-red-500">Failed</span>}
+                            </div>
+                            {currentTransaction && (
+                              <div className="text-xs space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500 dark:text-gray-400">Tx Hash:</span>
+                                  <a href={`https://etherscan.io/tx/${currentTransaction.hash}`} target="_blank" rel="noopener noreferrer" className="font-mono text-cosota hover:underline truncate max-w-[200px]">{currentTransaction.hash}</a>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500 dark:text-gray-400">Gas Used:</span>
+                                  <span className="font-medium text-gray-800 dark:text-gray-200">{currentTransaction.gasUsed?.toLocaleString()}</span>
+                                </div>
+                                 <div className="flex justify-between">
+                                  <span className="text-gray-500 dark:text-gray-400">Fee:</span>
+                                  <span className="font-medium text-gray-800 dark:text-gray-200">{currentTransaction.fee} ETH</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error/Success feedback */}
+                      {walletError && !isPublishing && !wallet?.isConnected && (
+                        <div className="px-4 py-2 text-red-600 text-sm bg-red-50 dark:bg-red-900/20 rounded-md">{walletError}</div>
+                      )}
+                      {transactionStage === 'failed' && (
+                         <div className="px-4 py-2 text-red-600 text-sm bg-red-50 dark:bg-red-900/20 rounded-md">Blockchain transaction failed. Please check wallet and try again.</div>
+                      )}
+
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              {!wallet?.isConnected ? (
                 <button
-                  className="mb-2 px-4 py-2 rounded bg-blue-600 text-white w-full"
+                  type="button"
                   onClick={handleConnectWallet}
                   disabled={isConnecting}
-                >{isConnecting ? 'Connecting...' : 'Connect Wallet'}</button>
-                {walletError && <div className="text-red-600 text-sm mb-2">{walletError}</div>}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 mt-4 mb-2">
-                <div className="flex items-center bg-green-100 dark:bg-green-900/30 rounded-full px-2 py-1">
-                  <div className="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
-                  <span className="text-xs font-medium text-green-800 dark:text-green-400 truncate max-w-[100px]">
-                    {wallet.address.substring(0, 6)}...{wallet.address.substring(wallet.address.length - 4)}
-                  </span>
-                </div>
-                <span className="ml-1 text-sm text-gray-500 dark:text-gray-400">Connected</span>
-              </div>
-            )}
-
-            {/* Transaction progress/status */}
-            {isPublishing && (
-              <div className="mt-4 space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaction Progress</h4>
-                  <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
-                    <div 
-                      className="bg-cosota h-2.5 rounded-full" 
-                      style={{ width: `${publishingProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                    {publishingProgress}% Complete
-                  </p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Transaction Details</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Status:</span>
-                      <span className="text-xs font-medium">
-                        {transactionStage === 'initializing' && (
-                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Initializing</span>
-                        )}
-                        {transactionStage === 'creating' && (
-                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Creating Transaction</span>
-                        )}
-                        {transactionStage === 'signing' && (
-                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Signing Transaction</span>
-                        )}
-                        {transactionStage === 'submitting' && (
-                          <span className="text-yellow-600 dark:text-yellow-400 flex items-center">Submitting to Blockchain</span>
-                        )}
-                        {transactionStage === 'confirmed' && (
-                          <span className="text-green-600 dark:text-green-400 flex items-center">Confirmed</span>
-                        )}
-                        {transactionStage === 'failed' && (
-                          <span className="text-red-600 dark:text-red-400 flex items-center">Failed</span>
-                        )}
-                      </span>
-                    </div>
-                    {currentTransaction && (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Transaction Hash:</span>
-                          <span className="text-xs font-mono text-gray-900 dark:text-gray-200 truncate max-w-[200px]">
-                            {currentTransaction.hash.substring(0, 10)}...{currentTransaction.hash.substring(currentTransaction.hash.length - 8)}
-                            <button 
-                              onClick={() => navigator.clipboard.writeText(currentTransaction.hash)}
-                              className="ml-1 text-cosota hover:text-cosota-dark inline-flex items-center"
-                            >
-                              <FiExternalLink className="h-3 w-3" />
-                            </button>
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Gas Used:</span>
-                          <span className="text-xs font-medium text-gray-900 dark:text-gray-200">
-                            {currentTransaction.gasUsed?.toLocaleString()} units
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Fee:</span>
-                          <span className="text-xs font-medium text-gray-900 dark:text-gray-200">
-                            {currentTransaction.fee} ETH
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Error/Success feedback */}
-            {walletError && !isPublishing && (
-              <div className="text-red-600 text-sm mt-2">{walletError}</div>
-            )}
-            {transactionStage === 'confirmed' && currentTransaction && (
-              <div className="text-green-600 text-sm mt-2">
-                Transaction successful! TxHash: <a href={`https://etherscan.io/tx/${currentTransaction.hash}`} target="_blank" rel="noopener noreferrer" className="underline">{currentTransaction.hash}</a>
-              </div>
-            )}
-            {transactionStage === 'failed' && (
-              <div className="text-red-600 text-sm mt-2">Blockchain transaction failed.</div>
-            )}
-
-            {/* Modal actions */}
-            <div className="flex justify-end gap-2 mt-6">
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={isPublishing || selectedLicense.status === 'published'}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-cosota text-base font-medium text-white hover:bg-cosota-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cosota-dark sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  {isPublishing ? 'Publishing...' : selectedLicense.status === 'published' ? 'Published' : 'Publish to Blockchain'}
+                </button>
+              )}
               <button
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                type="button"
                 onClick={() => { setSelectedLicense(null); setPublishingProgress(0); setCurrentTransaction(null); setTransactionStage('init'); setWalletError(null); }}
                 disabled={isPublishing}
-              >Close</button>
-              <button
-                className="px-4 py-2 rounded bg-cosota text-white hover:bg-cosota-dark"
-                onClick={handlePublish}
-                disabled={isPublishing || !wallet?.isConnected}
-              >{isPublishing ? 'Publishing...' : 'Publish to Blockchain'}</button>
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 sm:mt-0 sm:w-auto sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -31,6 +31,7 @@ export interface License {
   duration: number;
   territory: string;
   usageType: string;
+  licenseType: string;
   status: 'pending' | 'approved' | 'rejected' | 'paid' | 'published';
   rejectionReason?: string;
   certificateUrl?: string;
